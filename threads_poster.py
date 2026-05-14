@@ -68,20 +68,11 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             page.screenshot(path="screenshot_3_typed.png", full_page=False)
             print("[스크린샷] screenshot_3_typed.png 저장")
 
-            # Post 버튼 JavaScript 클릭
-            result = page.evaluate("""() => {
-                const btns = Array.from(document.querySelectorAll('[role="button"]'));
-                const btn = btns.find(b => {
-                    const t = b.textContent.trim();
-                    return t === 'Post' || t === '게시';
-                });
-                if (btn) {
-                    btn.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window}));
-                    return '클릭: ' + btn.textContent.trim();
-                }
-                return '게시버튼없음: ' + btns.map(b=>b.textContent.trim()).filter(t=>t).join(', ');
-            }""")
-            print(f"[게시] {result}")
+            # Post 버튼 Playwright 네이티브 클릭 (force=True로 오버레이 무시)
+            post_btn = page.locator('[role="button"]:has-text("Post"), [role="button"]:has-text("게시")').first
+            post_btn.wait_for(state="visible", timeout=5000)
+            post_btn.click(force=True)
+            print(f"[게시] 네이티브 클릭 완료")
             time.sleep(4)
 
             # 스크린샷4
