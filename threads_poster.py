@@ -39,6 +39,10 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
                 print("[오류] 세션 만료 - 로그인 페이지로 리디렉션됨")
                 return False
 
+            # 초기 contenteditable 수 기록 (피드에 있는 것들)
+            initial_editable_count = page.locator('[contenteditable="true"]').count()
+            print(f"[디버그] 초기 contenteditable 수: {initial_editable_count}")
+
             # "What's new?" 버튼 클릭
             page.evaluate("""() => {
                 const btns = Array.from(document.querySelectorAll('[role="button"]'));
@@ -53,28 +57,25 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             page.screenshot(path="screenshot_2_after_click.png", full_page=False)
             print("[스크린샷] screenshot_2_after_click.png 저장")
 
-            # contenteditable 클릭 후 execCommand로 텍스트 입력 (React state 정상 업데이트)
-            editable = page.locator('[contenteditable="true"]').first
+            after_click_count = page.locator('[contenteditable="true"]').count()
+            print(f"[디버그] 클릭 후 contenteditable 수: {after_click_count}")
+
+            # 모달이 열렸다면 새로 추가된 contenteditable이 있을 것
+            # last()로 가장 최근에 추가된 것 사용
+            editable = page.locator('[contenteditable="true"]').last
             editable.wait_for(state="visible", timeout=8000)
             editable.click()
             time.sleep(0.5)
 
-            # execCommand('insertText') → React synthetic event 정상 발화
-            safe_text = text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-            page.evaluate(f"""() => {{
-                const el = document.querySelector('[contenteditable="true"]');
-                if (el) {{
-                    el.focus();
-                    document.execCommand('insertText', false, `{safe_text}`);
-                }}
-            }}""")
+            # press_sequentially: Playwright가 keydown/keypress/keyup/input 이벤트 모두 발화
+            editable.press_sequentially(text, delay=30)
             time.sleep(1.5)
 
             page.screenshot(path="screenshot_3_typed.png", full_page=False)
             print("[스크린샷] screenshot_3_typed.png 저장")
 
-            # Post 버튼 클릭 (활성화 대기 후)
-            post_btn = page.locator('[role="button"]:has-text("Post"), [role="button"]:has-text("게시")').first
+            # Post 버튼 찾기 및 클릭
+            post_btn = page.locator('[role="button"]:has-text("Post"), [role="button"]:has-text("게시")').last
             post_btn.wait_for(state="visible", timeout=5000)
             time.sleep(0.5)
             post_btn.click(force=True)
@@ -84,18 +85,21 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             page.screenshot(path="screenshot_4_posted.png", full_page=False)
             print("[스크린샷] screenshot_4_posted.png 저장")
 
-            # 게시 성공 검증: compose box가 사라졌는지 확인
-            still_open = page.locator('[contenteditable="true"]').count()
-            if still_open > 0:
-                print("[경고] compose 창이 아직 열려있음 - 게시 실패 가능성")
-                # Ctrl+Enter로 한 번 더 시도
-                page.keyboard.press("Control+Return")
+            # 성공 검증: compose 창이 닫혔는지 (contenteditable 수가 줄었는지)
+            after_post_count = page.locator('[contenteditable="true"]').count()
+            print(f"[디버그] 게시 후 contenteditable 수: {after_post_count}")
+
+            if after_post_count >= after_click_count:
+                print("[경고] compose 창이 아직 열려있음 - Ctrl+Enter 재시도")
+                # Ctrl+Enter 재시도
+                page.keyboard.press("Control+Enter")
                 time.sleep(3)
                 page.screenshot(path="screenshot_5_retry.png", full_page=False)
                 print("[스크린샷] screenshot_5_retry.png 저장")
-                still_open2 = page.locator('[contenteditable="true"]').count()
-                if still_open2 > 0:
-                    print("[실패] 게시 실패 확인 (compose 창 계속 열림)")
+                retry_count = page.locator('[contenteditable="true"]').count()
+                print(f"[디버그] 재시도 후 contenteditable 수: {retry_count}")
+                if retry_count >= after_click_count:
+                    print("[실패] 게시 실패 확인")
                     return False
 
             print(f"[성공] {text[:50]}...")
