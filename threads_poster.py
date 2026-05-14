@@ -62,10 +62,19 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
 
             page.screenshot(path="screenshot_3_typed.png", full_page=False)
 
-            # 정확히 "Post" 또는 "게시" 텍스트인 버튼만 선택 (Post Options, Post is shared to Fediverse 제외)
-            post_btn = page.locator('[role="button"]:text-is("Post"), [role="button"]:text-is("게시")').last
-            post_btn.wait_for(state="visible", timeout=5000)
-            post_btn.click(force=True)
+            # JavaScript로 정확히 "Post"/"게시" 버튼 찾아 클릭 (Post Options 등 제외)
+            clicked = page.evaluate("""() => {
+                const btns = Array.from(document.querySelectorAll('[role="button"]'));
+                const postBtns = btns.filter(b => {
+                    const t = b.textContent.trim();
+                    return t === 'Post' || t === '게시';
+                });
+                if (postBtns.length === 0) return 'NOT_FOUND';
+                // 마지막 버튼 = compose 모달의 게시 버튼
+                postBtns[postBtns.length - 1].click();
+                return 'CLICKED:' + postBtns.length;
+            }""")
+            print(f"[게시] JS 클릭 결과: {clicked}")
             print("[게시] 클릭 완료")
             time.sleep(5)
 
