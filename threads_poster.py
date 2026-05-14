@@ -33,15 +33,10 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             print(f"[URL] {page.url}")
 
             page.screenshot(path="screenshot_1_loaded.png", full_page=False)
-            print("[스크린샷] screenshot_1_loaded.png 저장")
 
             if "login" in page.url or "accounts" in page.url:
-                print("[오류] 세션 만료 - 로그인 페이지로 리디렉션됨")
+                print("[오류] 세션 만료")
                 return False
-
-            # 초기 contenteditable 수 기록 (피드에 있는 것들)
-            initial_editable_count = page.locator('[contenteditable="true"]').count()
-            print(f"[디버그] 초기 contenteditable 수: {initial_editable_count}")
 
             # "What's new?" 버튼 클릭
             page.evaluate("""() => {
@@ -55,52 +50,59 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             time.sleep(2)
 
             page.screenshot(path="screenshot_2_after_click.png", full_page=False)
-            print("[스크린샷] screenshot_2_after_click.png 저장")
 
-            after_click_count = page.locator('[contenteditable="true"]').count()
-            print(f"[디버그] 클릭 후 contenteditable 수: {after_click_count}")
-
-            # 모달이 열렸다면 새로 추가된 contenteditable이 있을 것
-            # last()로 가장 최근에 추가된 것 사용
             editable = page.locator('[contenteditable="true"]').last
             editable.wait_for(state="visible", timeout=8000)
             editable.click()
             time.sleep(0.5)
 
-            # press_sequentially: Playwright가 keydown/keypress/keyup/input 이벤트 모두 발화
+            # 텍스트 입력
             editable.press_sequentially(text, delay=30)
             time.sleep(1.5)
 
             page.screenshot(path="screenshot_3_typed.png", full_page=False)
-            print("[스크린샷] screenshot_3_typed.png 저장")
 
-            # Post 버튼 찾기 및 클릭
+            # Post 버튼 상태 상세 디버깅
+            btn_debug = page.evaluate("""() => {
+                const results = [];
+                const all = document.querySelectorAll('[role="button"]');
+                all.forEach((b, i) => {
+                    const t = b.textContent.trim();
+                    if (t === 'Post' || t === '게시' || t.includes('Post') || t.includes('게시')) {
+                        results.push({
+                            index: i,
+                            text: t.slice(0, 30),
+                            ariaDisabled: b.getAttribute('aria-disabled'),
+                            disabled: b.hasAttribute('disabled'),
+                            tabIndex: b.getAttribute('tabindex'),
+                            className: b.className.slice(0, 60)
+                        });
+                    }
+                });
+                return results;
+            }""")
+            print(f"[디버그] Post 버튼 목록: {btn_debug}")
+
+            # contenteditable 실제 내용 확인
+            editable_content = page.evaluate("""() => {
+                const el = document.querySelector('[contenteditable="true"]');
+                return el ? el.textContent.slice(0, 50) : 'NOT FOUND';
+            }""")
+            print(f"[디버그] contenteditable 내용: '{editable_content}'")
+
+            # 비활성화 여부와 관계없이 클릭
             post_btn = page.locator('[role="button"]:has-text("Post"), [role="button"]:has-text("게시")').last
             post_btn.wait_for(state="visible", timeout=5000)
-            time.sleep(0.5)
             post_btn.click(force=True)
             print("[게시] 클릭 완료")
             time.sleep(5)
 
             page.screenshot(path="screenshot_4_posted.png", full_page=False)
-            print("[스크린샷] screenshot_4_posted.png 저장")
 
-            # 성공 검증: compose 창이 닫혔는지 (contenteditable 수가 줄었는지)
             after_post_count = page.locator('[contenteditable="true"]').count()
-            print(f"[디버그] 게시 후 contenteditable 수: {after_post_count}")
-
-            if after_post_count >= after_click_count:
-                print("[경고] compose 창이 아직 열려있음 - Ctrl+Enter 재시도")
-                # Ctrl+Enter 재시도
-                page.keyboard.press("Control+Enter")
-                time.sleep(3)
-                page.screenshot(path="screenshot_5_retry.png", full_page=False)
-                print("[스크린샷] screenshot_5_retry.png 저장")
-                retry_count = page.locator('[contenteditable="true"]').count()
-                print(f"[디버그] 재시도 후 contenteditable 수: {retry_count}")
-                if retry_count >= after_click_count:
-                    print("[실패] 게시 실패 확인")
-                    return False
+            if after_post_count > 0:
+                print(f"[실패] compose 창 아직 열림 ({after_post_count}개)")
+                return False
 
             print(f"[성공] {text[:50]}...")
             return True
