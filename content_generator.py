@@ -55,6 +55,7 @@ JSON으로 반환:
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             result = json.loads(match.group())
+            result["text"] = result["text"].rstrip() + "\n\nhttps://blog.naver.com/remember0706"
             print(f"[콘텐츠 생성 완료] {len(result['text'])}자")
             return result
         raise ValueError("JSON 파싱 실패")
@@ -69,6 +70,7 @@ JSON으로 반환:
                 f"📊 ICT 관점: 현재 가격대는 주요 유동성 구간 근처입니다.\n"
                 f"킬존(뉴욕/런던) 전후 움직임을 주시하세요.\n"
                 f"※ 개인 판단 하에 참고용으로만 활용하세요.\n\n"
-                f"#비트코인 #BTC #ICT #차트분석 #암호화폐"
+                f"#비트코인 #BTC #ICT #차트분석 #암호화폐\n\n"
+                f"https://blog.naver.com/remember0706"
             )
         }
