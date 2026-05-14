@@ -2,7 +2,7 @@ name: Threads BTC ICT 자동 포스팅
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # 09:00 KST
+    - cron: '10 0 * * *'  # 09:10 KST
     - cron: '0 4 * * *'   # 13:00 KST
     - cron: '0 8 * * *'   # 17:00 KST
     - cron: '0 12 * * *'  # 21:00 KST
