@@ -1,0 +1,5 @@
+threads_session.json
+post_log.txt
+debug_result.txt
+__pycache__/
+*.pyc
