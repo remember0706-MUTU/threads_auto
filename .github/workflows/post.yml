@@ -6,7 +6,7 @@ on:
     - cron: '0 4 * * *'   # 13:00 KST
     - cron: '0 8 * * *'   # 17:00 KST
     - cron: '0 12 * * *'  # 21:00 KST
-  workflow_dispatch:       # 수동 실행 가능
+  workflow_dispatch:
 
 jobs:
   post:
@@ -26,10 +26,17 @@ jobs:
         run: playwright install chromium --with-deps
 
       - name: 세션 파일 복원
-        run: |
-          echo "${{ secrets.THREADS_SESSION }}" | base64 -d > threads_session.json
+        run: echo "${{ secrets.THREADS_SESSION }}" | base64 -d > threads_session.json
 
       - name: 포스팅 실행
         env:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: python main.py test
+
+      - name: 스크린샷 업로드 (디버깅)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshot_*.png
+          retention-days: 1
