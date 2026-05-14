@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-import time, os, base64
+import time, os
 
 SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "threads_session.json")
 
@@ -32,11 +32,9 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
 
             print(f"[URL] {page.url}")
 
-            # 스크린샷 저장 (디버깅용)
             page.screenshot(path="screenshot_1_loaded.png", full_page=False)
             print("[스크린샷] screenshot_1_loaded.png 저장")
 
-            # 로그인 체크
             if "login" in page.url or "accounts" in page.url:
                 print("[오류] 세션 만료 - 로그인 페이지로 리디렉션됨")
                 return False
@@ -52,32 +50,54 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             }""")
             time.sleep(2)
 
-            # 스크린샷2
             page.screenshot(path="screenshot_2_after_click.png", full_page=False)
             print("[스크린샷] screenshot_2_after_click.png 저장")
 
-            # contenteditable 대기 및 입력
+            # contenteditable 클릭 후 execCommand로 텍스트 입력 (React state 정상 업데이트)
             editable = page.locator('[contenteditable="true"]').first
             editable.wait_for(state="visible", timeout=8000)
             editable.click()
             time.sleep(0.5)
-            page.keyboard.type(text, delay=25)
+
+            # execCommand('insertText') → React synthetic event 정상 발화
+            safe_text = text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+            page.evaluate(f"""() => {{
+                const el = document.querySelector('[contenteditable="true"]');
+                if (el) {{
+                    el.focus();
+                    document.execCommand('insertText', false, `{safe_text}`);
+                }}
+            }}""")
             time.sleep(1.5)
 
-            # 스크린샷3
             page.screenshot(path="screenshot_3_typed.png", full_page=False)
             print("[스크린샷] screenshot_3_typed.png 저장")
 
-            # Post 버튼 Playwright 네이티브 클릭 (force=True로 오버레이 무시)
+            # Post 버튼 클릭 (활성화 대기 후)
             post_btn = page.locator('[role="button"]:has-text("Post"), [role="button"]:has-text("게시")').first
             post_btn.wait_for(state="visible", timeout=5000)
+            time.sleep(0.5)
             post_btn.click(force=True)
-            print(f"[게시] 네이티브 클릭 완료")
-            time.sleep(4)
+            print("[게시] 클릭 완료")
+            time.sleep(5)
 
-            # 스크린샷4
             page.screenshot(path="screenshot_4_posted.png", full_page=False)
             print("[스크린샷] screenshot_4_posted.png 저장")
+
+            # 게시 성공 검증: compose box가 사라졌는지 확인
+            still_open = page.locator('[contenteditable="true"]').count()
+            if still_open > 0:
+                print("[경고] compose 창이 아직 열려있음 - 게시 실패 가능성")
+                # Ctrl+Enter로 한 번 더 시도
+                page.keyboard.press("Control+Return")
+                time.sleep(3)
+                page.screenshot(path="screenshot_5_retry.png", full_page=False)
+                print("[스크린샷] screenshot_5_retry.png 저장")
+                still_open2 = page.locator('[contenteditable="true"]').count()
+                if still_open2 > 0:
+                    print("[실패] 게시 실패 확인 (compose 창 계속 열림)")
+                    return False
+
             print(f"[성공] {text[:50]}...")
             return True
 
