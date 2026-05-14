@@ -62,36 +62,8 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
 
             page.screenshot(path="screenshot_3_typed.png", full_page=False)
 
-            # Post 버튼 상태 상세 디버깅
-            btn_debug = page.evaluate("""() => {
-                const results = [];
-                const all = document.querySelectorAll('[role="button"]');
-                all.forEach((b, i) => {
-                    const t = b.textContent.trim();
-                    if (t === 'Post' || t === '게시' || t.includes('Post') || t.includes('게시')) {
-                        results.push({
-                            index: i,
-                            text: t.slice(0, 30),
-                            ariaDisabled: b.getAttribute('aria-disabled'),
-                            disabled: b.hasAttribute('disabled'),
-                            tabIndex: b.getAttribute('tabindex'),
-                            className: b.className.slice(0, 60)
-                        });
-                    }
-                });
-                return results;
-            }""")
-            print(f"[디버그] Post 버튼 목록: {btn_debug}")
-
-            # contenteditable 실제 내용 확인
-            editable_content = page.evaluate("""() => {
-                const el = document.querySelector('[contenteditable="true"]');
-                return el ? el.textContent.slice(0, 50) : 'NOT FOUND';
-            }""")
-            print(f"[디버그] contenteditable 내용: '{editable_content}'")
-
-            # 비활성화 여부와 관계없이 클릭
-            post_btn = page.locator('[role="button"]:has-text("Post"), [role="button"]:has-text("게시")').last
+            # 정확히 "Post" 또는 "게시" 텍스트인 버튼만 선택 (Post Options, Post is shared to Fediverse 제외)
+            post_btn = page.locator('[role="button"]:text-is("Post"), [role="button"]:text-is("게시")').last
             post_btn.wait_for(state="visible", timeout=5000)
             post_btn.click(force=True)
             print("[게시] 클릭 완료")
