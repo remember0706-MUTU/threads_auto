@@ -5,6 +5,7 @@
 import anthropic
 import json
 import re
+import time
 from config import CLAUDE_API_KEY
 
 client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
@@ -45,32 +46,43 @@ def generate_threads_content(btc_data: dict) -> dict:
 JSON으로 반환:
 {{"text": "전체 포스팅 내용"}}"""
 
-    try:
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = message.content[0].text
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
-            result = json.loads(match.group())
-            result["text"] = result["text"].rstrip() + "\n\nhttps://blog.naver.com/remember0706"
-            print(f"[콘텐츠 생성 완료] {len(result['text'])}자")
-            return result
-        raise ValueError("JSON 파싱 실패")
-
-    except Exception as e:
-        print(f"[콘텐츠 생성 오류] {e} → 기본 콘텐츠 사용")
-        direction = "▲" if change > 0 else "▼"
-        return {
-            "text": (
-                f"{emoji} BTC ${usd:,.0f} | ₩{krw//10000:,.0f}만\n"
-                f"{direction} 24h {change:+.2f}%\n\n"
-                f"📊 ICT 관점: 현재 가격대는 주요 유동성 구간 근처입니다.\n"
-                f"킬존(뉴욕/런던) 전후 움직임을 주시하세요.\n"
-                f"※ 개인 판단 하에 참고용으로만 활용하세요.\n\n"
-                f"#비트코인 #BTC #ICT #차트분석 #암호화폐\n\n"
-                f"https://blog.naver.com/remember0706"
+    for attempt in range(4):
+        try:
+            message = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=600,
+                messages=[{"role": "user", "content": prompt}]
             )
-        }
+            raw = message.content[0].text
+            match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if match:
+                result = json.loads(match.group())
+                result["text"] = result["text"].rstrip() + "\n\nhttps://blog.naver.com/remember0706"
+                print(f"[콘텐츠 생성 완료] {len(result['text'])}자")
+                return result
+            raise ValueError("JSON 파싱 실패")
+
+        except anthropic.OverloadedError:
+            if attempt < 3:
+                wait = 30 * (2 ** attempt)
+                print(f"[API 과부하] {wait}초 후 재시도... ({attempt+1}/3)")
+                time.sleep(wait)
+                continue
+            print("[API 과부하] 재시도 횟수 초과 → 기본 콘텐츠 사용")
+            break
+        except Exception as e:
+            print(f"[콘텐츠 생성 오류] {e} → 기본 콘텐츠 사용")
+            break
+
+    direction = "▲" if change > 0 else "▼"
+    return {
+        "text": (
+            f"{emoji} BTC ${usd:,.0f} | ₩{krw//10000:,.0f}만\n"
+            f"{direction} 24h {change:+.2f}%\n\n"
+            f"📊 ICT 관점: 현재 가격대는 주요 유동성 구간 근처입니다.\n"
+            f"킬존(뉴욕/런던) 전후 움직임을 주시하세요.\n"
+            f"※ 개인 판단 하에 참고용으로만 활용하세요.\n\n"
+            f"#비트코인 #BTC #ICT #차트분석 #암호화폐\n\n"
+            f"https://blog.naver.com/remember0706"
+        )
+    }
