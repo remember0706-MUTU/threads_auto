@@ -1,7 +1,3 @@
-# =============================================
-# 쓰레드 자동 포스팅 - 비트코인 ICT 브리핑
-# =============================================
-
 import sys
 import schedule
 import time
@@ -10,21 +6,24 @@ from datetime import datetime
 
 if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except AttributeError:
         pass
 
 from config import POST_TIMES
 from bitcoin_fetcher import get_bitcoin_price
 from content_generator import generate_threads_content
+from quote_generator import generate_quote_content
 from threads_poster import post_to_threads, check_api_connection
+
+QUOTE_DELAY = int(os.environ.get("QUOTE_DELAY", "600"))  # 기본 10분
 
 
 def run_post():
-    print(f"\n{'='*50}")
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 포스팅 시작")
-    print(f"{'='*50}")
+    print("\n" + "="*50)
+    print("[" + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "] 포스팅 시작")
+    print("="*50)
 
     if not check_api_connection():
         print("[중단] 세션 파일 없음")
@@ -36,37 +35,57 @@ def run_post():
         print("[중단] 비트코인 가격 수집 실패")
         return
 
-    # 2. ICT 분석 콘텐츠 생성
+    # 2. ICT 분석 포스팅
     content = generate_threads_content(btc)
-
-    # 3. 포스팅
     success = post_to_threads(text=content["text"])
 
     if success:
-        print(f"[완료] 포스팅 성공!")
+        print("[완료] BTC ICT 포스팅 성공!")
         log_post(btc, content)
     else:
-        print("[실패] 포스팅 실패")
+        print("[실패] BTC 포스팅 실패")
+        return
 
-    print(f"{'='*50}\n")
+    # 3. 10분 대기 후 격언 포스팅
+    print("[대기] " + str(QUOTE_DELAY // 60) + "분 후 격언 포스팅 시작...")
+    time.sleep(QUOTE_DELAY)
+
+    quote = generate_quote_content()
+    success2 = post_to_threads(text=quote["text"])
+
+    if success2:
+        print("[완료] 격언 포스팅 성공!")
+        log_quote(quote)
+    else:
+        print("[실패] 격언 포스팅 실패")
+
+    print("="*50 + "\n")
 
 
 def log_post(btc, content):
     with open("post_log.txt", "a", encoding="utf-8") as f:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{now}] BTC ${btc['usd']:,.0f} ({btc['change_24h']:+.2f}%)\n")
-        f.write(f"{content['text'][:80]}...\n")
-        f.write("-" * 40 + "\n")
+        f.write("[" + now + "] BTC $" + str(btc["usd"]) + " (" + str(btc["change_24h"]) + "%)\n")
+        f.write(content["text"][:80] + "...\n")
+        f.write("-"*40 + "\n")
+
+
+def log_quote(quote):
+    with open("post_log.txt", "a", encoding="utf-8") as f:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write("[" + now + "] 격언 포스팅\n")
+        f.write(quote["text"][:80] + "...\n")
+        f.write("-"*40 + "\n")
 
 
 def main():
-    print("쓰레드 비트코인 ICT 브리핑 자동화 시작!")
-    print(f"포스팅 시간: {POST_TIMES}")
+    print("쓰레드 자동 포스팅 시작!")
+    print("포스팅 시간: " + str(POST_TIMES))
     check_api_connection()
 
     for t in POST_TIMES:
         schedule.every().day.at(t).do(run_post)
-        print(f"[스케줄] 매일 {t} 예약됨")
+        print("[스케줄] 매일 " + t + " 예약됨")
 
     print("\n[대기 중] 종료하려면 Ctrl+C\n")
     while True:
