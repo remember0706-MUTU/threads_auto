@@ -38,7 +38,7 @@ def generate_threads_content(btc_data: dict) -> dict:
 3. 마지막: 해시태그 4~5개
 
 규칙:
-- 총 450자 이내 (공백 포함)
+- 총 400자 이내 (공백 포함)
 - 투자 권유 절대 금지 ("개인 판단" 문구 포함)
 - 전문적이지만 읽기 쉬운 말투
 - 이모지 3~5개
@@ -57,7 +57,7 @@ JSON으로 반환:
             match = re.search(r'\{.*\}', raw, re.DOTALL)
             if match:
                 result = json.loads(match.group())
-                result["text"] = result["text"].rstrip() + "\n\nhttps://blog.naver.com/remember0706"
+                result["text"] = result["text"].rstrip() + "\n\nhttps://blog.naver.com/remember0706\nhttps://open.kakao.com/o/gFAMphci"
                 print(f"[콘텐츠 생성 완료] {len(result['text'])}자")
                 return result
             raise ValueError("JSON 파싱 실패")
@@ -83,6 +83,6 @@ JSON으로 반환:
             f"킬존(뉴욕/런던) 전후 움직임을 주시하세요.\n"
             f"※ 개인 판단 하에 참고용으로만 활용하세요.\n\n"
             f"#비트코인 #BTC #ICT #차트분석 #암호화폐\n\n"
-            f"https://blog.naver.com/remember0706"
+            f"https://blog.naver.com/remember0706\nhttps://open.kakao.com/o/gFAMphci"
         )
     }
