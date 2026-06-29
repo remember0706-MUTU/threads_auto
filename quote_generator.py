@@ -35,8 +35,11 @@ def generate_quote_content():
         "- 광고 느낌 없이 진심 어린 글\n"
         "- 관련 해시태그 4~5개 마지막에 추가\n"
         "- 총 450자 이내\n\n"
+        "그리고 위 한국어 내용을 자연스러운 영어로도 번역해주세요 (text_en):\n"
+        "- 직역 말고 영어 원어민이 쓸 법한 자연스러운 표현으로\n"
+        "- 이모지는 동일하게 유지\n\n"
         "JSON으로 반환:\n"
-        '{"text": "전체 내용 (해시태그 포함)"}'
+        '{"text": "전체 내용 (해시태그 포함)", "text_en": "English version"}'
     )
 
     try:
@@ -56,5 +59,6 @@ def generate_quote_content():
     except Exception as e:
         print("[격언 생성 오류] " + str(e))
         return {
-            "text": "오늘 하루도 수고했어요 ✨\n작은 것에도 감사할 줄 아는 사람이\n결국 가장 행복한 사람입니다.\n\n#좋은말 #오늘의격언 #힘내요 #감성글 #공감"
+            "text": "오늘 하루도 수고했어요 ✨\n작은 것에도 감사할 줄 아는 사람이\n결국 가장 행복한 사람입니다.\n\n#좋은말 #오늘의격언 #힘내요 #감성글 #공감",
+            "text_en": "You've worked hard today ✨\nThe person who can find gratitude in small things\nis ultimately the happiest.\n\n#goodwords #dailyquote #keepgoing #motivation #empathy"
         }
