@@ -54,7 +54,9 @@ def run_good_words():
         return
 
     quote = generate_quote_content()
-    success = post_to_threads(text=quote["text"])
+    text_en = quote.get("text_en", "")
+    full_text = quote["text"] + ("\n\n" + text_en if text_en else "")
+    success = post_to_threads(text=full_text)
 
     if success:
         print("[완료] Good Words 포스팅 성공!")
