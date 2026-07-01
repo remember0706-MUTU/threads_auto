@@ -38,10 +38,10 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: python main_instagram.py
 
-      - name: Upload screenshots on failure
-        if: failure()
+      - name: Upload screenshots (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-screenshots
-          path: screenshot_*.png
+          name: instagram-screenshots
+          path: ig_*.png
           if-no-files-found: ignore
