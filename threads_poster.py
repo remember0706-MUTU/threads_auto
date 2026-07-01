@@ -188,8 +188,14 @@ def post_to_threads(text: str, image_url: str = None, reply_text: str = None) ->
                     try:
                         reply_editor = page.locator('[contenteditable="true"]').last
                         reply_editor.wait_for(state="visible", timeout=8000)
-                        reply_editor.click()
                         time.sleep(0.5)
+                        # Playwright click 대신 JS focus — 클릭 타임아웃 방지
+                        page.evaluate("""() => {
+                            const editors = document.querySelectorAll('[contenteditable="true"]');
+                            const editor = editors[editors.length - 1];
+                            if (editor) { editor.focus(); editor.click(); }
+                        }""")
+                        time.sleep(0.3)
                         # 줄별로 execCommand 삽입 + Enter 키로 줄바꿈 처리
                         lines = reply_text.split('\n')
                         for i, line in enumerate(lines):
