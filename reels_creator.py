@@ -84,16 +84,19 @@ def create_gradient_bg(width=1080, height=1920, c1=(15, 15, 35), c2=(50, 20, 80)
 
 def create_reels_video(text: str, image_path: str = None,
                        output_path: str = "reels_output.mp4",
-                       bgm_path: str = None, duration: int = 18) -> str:
+                       bgm_path: str = None, duration: int = 18,
+                       text_en: str = "") -> str:
     from moviepy.editor import ImageSequenceClip, AudioFileClip
 
     W, H, FPS = 1080, 1920, 24
     PADDING = 70
     MAX_W = W - PADDING * 2
 
-    # ── 폰트 먼저 탐색 ──
-    font_body = find_korean_font(52)
-    font_tag  = find_korean_font(32)
+    # ── 폰트 탐색 (영어 있으면 한글 폰트 약간 축소해서 공간 확보) ──
+    ko_size = 44 if text_en else 52
+    font_body = find_korean_font(ko_size)
+    font_tag  = find_korean_font(28)
+    font_en   = find_korean_font(26) if text_en else None
 
     # ── 텍스트 파싱 ──
     dummy_img  = Image.new('RGB', (W, H))
@@ -129,17 +132,26 @@ def create_reels_video(text: str, image_path: str = None,
 
     # 줄 수가 너무 많으면 폰트 줄임
     if len(body_lines) > 9 and font_body:
-        font_body = find_korean_font(40)
+        font_body = find_korean_font(36)
         body_lines = []
         for l in body_lines_raw:
             body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
     elif len(body_lines) > 6 and font_body:
-        font_body = find_korean_font(46)
+        font_body = find_korean_font(40)
         body_lines = []
         for l in body_lines_raw:
             body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
 
-    print(f"[영상] 본문 {len(body_lines)}줄, 해시태그 {len(tag_lines)}줄")
+    # ── 영어 파싱 (해시태그 제외, 이모지 제거) ──
+    en_lines = []
+    if text_en and font_en:
+        en_raw = [l.strip() for l in text_en.split('\n')
+                  if l.strip() and not l.strip().startswith('#')]
+        en_lines_raw = [strip_emoji(l).strip() for l in en_raw if strip_emoji(l).strip()]
+        for l in en_lines_raw:
+            en_lines.extend(wrap_text(dummy_draw, l, font_en, MAX_W))
+
+    print(f"[영상] 한글 {len(body_lines)}줄, 영어 {len(en_lines)}줄, 해시태그 {len(tag_lines)}줄")
 
     # ── 배경 ──
     if image_path and os.path.exists(image_path):
@@ -156,24 +168,29 @@ def create_reels_video(text: str, image_path: str = None,
     # ── 레이아웃 계산 ──
     body_lh = int(size_of(font_body) * 1.5) if font_body else 60
     tag_lh  = int(size_of(font_tag)  * 1.5) if font_tag  else 40
-    total_h = len(body_lines) * body_lh + (24 if tag_lines else 0) + len(tag_lines) * tag_lh
+    en_lh   = int(size_of(font_en)   * 1.5) if font_en   else 38
+    en_gap  = 28 if en_lines else 0   # 한글-영어 구분 여백
+
+    total_h = (len(body_lines) * body_lh
+               + en_gap + len(en_lines) * en_lh
+               + (20 if tag_lines else 0) + len(tag_lines) * tag_lh)
     y0 = max(PADDING, (H - total_h) // 2)
 
-    total_lines = len(body_lines) + len(tag_lines)
+    total_lines = len(body_lines) + len(en_lines) + len(tag_lines)
 
     def make_frame(i):
         t = i / (FPS * duration)  # 0.0 → 1.0
-        # 각 줄은 순서대로 등장: 40% 시점까지 전체 텍스트가 다 나타남
         frame = bg.copy().convert('RGBA')
         overlay = Image.new('RGBA', (W, H), (0, 0, 0, 155))
         frame = Image.alpha_composite(frame, overlay)
         draw = ImageDraw.Draw(frame)
 
         y = y0
+
+        # 한글 본문 (흰색)
         for j, line in enumerate(body_lines):
-            reveal_t = (j / max(total_lines, 1)) * 0.4  # 40% 시점에 마지막 줄 등장
-            fade_dur = 0.08
-            raw_a = (t - reveal_t) / fade_dur
+            reveal_t = (j / max(total_lines, 1)) * 0.4
+            raw_a = (t - reveal_t) / 0.08
             alpha = int(max(0.0, min(1.0, raw_a)) * 255)
             if alpha > 0 and font_body:
                 try:
@@ -185,12 +202,29 @@ def create_reels_video(text: str, image_path: str = None,
                 draw.text((x, y), line, font=font_body, fill=(255, 255, 255, alpha))
             y += body_lh
 
-        y += 24
-        for j, line in enumerate(tag_lines):
+        # 영어 번역 (구분 여백 + 연한 회백색)
+        y += en_gap
+        for j, line in enumerate(en_lines):
             k = len(body_lines) + j
             reveal_t = (k / max(total_lines, 1)) * 0.4
-            fade_dur = 0.08
-            raw_a = (t - reveal_t) / fade_dur
+            raw_a = (t - reveal_t) / 0.08
+            alpha = int(max(0.0, min(1.0, raw_a)) * 255)
+            if alpha > 0 and font_en:
+                try:
+                    tw = int(draw.textlength(line, font=font_en))
+                except:
+                    tw = len(line) * size_of(font_en)
+                x = max(PADDING, (W - tw) // 2)
+                draw.text((x + 1, y + 1), line, font=font_en, fill=(0, 0, 0, alpha // 3))
+                draw.text((x, y), line, font=font_en, fill=(200, 200, 200, alpha))
+            y += en_lh
+
+        # 해시태그 (연파랑)
+        y += 20
+        for j, line in enumerate(tag_lines):
+            k = len(body_lines) + len(en_lines) + j
+            reveal_t = (k / max(total_lines, 1)) * 0.4
+            raw_a = (t - reveal_t) / 0.08
             alpha = int(max(0.0, min(1.0, raw_a)) * 255)
             if alpha > 0 and font_tag:
                 try:

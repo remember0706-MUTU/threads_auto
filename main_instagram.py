@@ -21,6 +21,7 @@ def run_instagram_reels() -> bool:
 
     quote = generate_quote_content()
     korean_text = quote["text"]
+    english_text = quote.get("text_en", "")
     category = get_today_category()
     print(f"[콘텐츠] 카테고리: {category}")
 
@@ -43,7 +44,7 @@ def run_instagram_reels() -> bool:
     video_path = "reels_output.mp4"
     bgm_path = "bgm.mp3" if os.path.exists("bgm.mp3") else None
     print("[영상] 생성 중... (30~60초 소요)")
-    create_reels_video(korean_text, image_path, video_path, bgm_path, duration=18)
+    create_reels_video(korean_text, image_path, video_path, bgm_path, duration=18, text_en=english_text)
 
     # 인스타그램 게시
     success = post_reel(video_path, korean_text)
