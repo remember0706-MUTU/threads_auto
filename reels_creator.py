@@ -1,7 +1,23 @@
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os
+import re
 import glob as _glob
+
+def strip_emoji(text):
+    """이모지 제거 — 폰트가 지원 안 해서 박스로 나오는 문자 제거."""
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F300-\U0001F9FF"   # 이모지 전체 범위
+        "\U00002702-\U000027B0"
+        "\U000024C2-\U0001F251"
+        "☀-⯿"
+        "️"                   # variation selector
+        "‍"                   # zero-width joiner
+        "]+",
+        flags=re.UNICODE
+    )
+    return emoji_pattern.sub('', text).strip()
 
 def find_korean_font(size):
     """한국어 지원 폰트를 찾아 반환. 없으면 None."""
@@ -89,9 +105,11 @@ def create_reels_video(text: str, image_path: str = None,
     body_lines_raw, tag_lines_raw = [], []
     for line in raw_lines:
         if line.startswith('#'):
-            tag_lines_raw.append(line)
+            tag_lines_raw.append(strip_emoji(line).strip())
         else:
-            body_lines_raw.append(line)
+            cleaned = strip_emoji(line).strip()
+            if cleaned:
+                body_lines_raw.append(cleaned)
 
     # 해시태그가 별도 줄 없으면 마지막 본문에서 분리
     if not tag_lines_raw and body_lines_raw:
