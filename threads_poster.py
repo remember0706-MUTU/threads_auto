@@ -57,6 +57,23 @@ def post_to_threads(text: str, image_url: str = None, reply_text: str = None) ->
                 print("[오류] 세션 만료")
                 return False
 
+            # "We removed your comment" 등 알림 팝업 닫기
+            popup_result = page.evaluate("""() => {
+                const buttons = document.querySelectorAll('[role="button"]');
+                for (const btn of buttons) {
+                    const label = btn.getAttribute('aria-label') || '';
+                    const text = btn.textContent?.trim() || '';
+                    if (label === 'Close' || text === '×' || text === 'Close') {
+                        btn.click();
+                        return 'CLOSED';
+                    }
+                }
+                return 'NO_POPUP';
+            }""")
+            if popup_result == 'CLOSED':
+                print("[팝업] 알림 팝업 닫기 완료")
+                time.sleep(1)
+
             # 로그인된 사용자명 추출 (프로필 링크에서)
             username = page.evaluate("""() => {
                 const links = document.querySelectorAll('a[href^="/@"]');
