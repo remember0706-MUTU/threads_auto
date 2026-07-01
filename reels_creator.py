@@ -92,18 +92,11 @@ def create_reels_video(text: str, image_path: str = None,
     PADDING = 70
     MAX_W = W - PADDING * 2
 
-    # ── 폰트 탐색 (영어 있으면 한글 폰트 약간 축소해서 공간 확보) ──
-    ko_size = 44 if text_en else 52
-    font_body = find_korean_font(ko_size)
-    font_tag  = find_korean_font(28)
-    font_en   = find_korean_font(26) if text_en else None
-
     # ── 텍스트 파싱 ──
     dummy_img  = Image.new('RGB', (W, H))
     dummy_draw = ImageDraw.Draw(dummy_img)
 
     raw_lines = [l.strip() for l in text.split('\n') if l.strip()]
-
     body_lines_raw, tag_lines_raw = [], []
     for line in raw_lines:
         if line.startswith('#'):
@@ -113,7 +106,6 @@ def create_reels_video(text: str, image_path: str = None,
             if cleaned:
                 body_lines_raw.append(cleaned)
 
-    # 해시태그가 별도 줄 없으면 마지막 본문에서 분리
     if not tag_lines_raw and body_lines_raw:
         last = body_lines_raw[-1]
         idx = last.find('#')
@@ -122,36 +114,42 @@ def create_reels_video(text: str, image_path: str = None,
             body_lines_raw[-1:] = [before] if before else []
             tag_lines_raw = [last[idx:].strip()]
 
-    # 줄바꿈 적용
-    body_lines = []
-    for l in body_lines_raw:
-        body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
+    # 영어 raw 라인 파싱 (해시태그 제외)
+    en_lines_raw = []
+    if text_en:
+        en_raw = [l.strip() for l in text_en.split('\n')
+                  if l.strip() and not l.strip().startswith('#')]
+        en_lines_raw = [strip_emoji(l).strip() for l in en_raw if strip_emoji(l).strip()]
+
+    # 쌍 수 기준으로 폰트 크기 결정
+    n_pairs = max(len(body_lines_raw), len(en_lines_raw), 1)
+    if n_pairs <= 5:
+        ko_size, en_size = 42, 26
+    elif n_pairs <= 7:
+        ko_size, en_size = 38, 24
+    else:
+        ko_size, en_size = 34, 22
+
+    font_body = find_korean_font(ko_size)
+    font_tag  = find_korean_font(26)
+    font_en   = find_korean_font(en_size) if text_en else None
+
+    # ── 인터리브 쌍 구성: [(ko_wrapped_lines, en_wrapped_lines), ...] ──
+    pairs = []
+    for i in range(max(len(body_lines_raw), len(en_lines_raw))):
+        ko = body_lines_raw[i] if i < len(body_lines_raw) else ""
+        en = en_lines_raw[i]   if i < len(en_lines_raw)   else ""
+        ko_w = wrap_text(dummy_draw, ko, font_body, MAX_W) if ko else []
+        en_w = wrap_text(dummy_draw, en, font_en,  MAX_W) if (en and font_en) else []
+        if ko_w or en_w:
+            pairs.append((ko_w, en_w))
+
+    # 해시태그 줄바꿈
     tag_lines = []
     for l in tag_lines_raw:
         tag_lines.extend(wrap_text(dummy_draw, l, font_tag, MAX_W))
 
-    # 줄 수가 너무 많으면 폰트 줄임
-    if len(body_lines) > 9 and font_body:
-        font_body = find_korean_font(36)
-        body_lines = []
-        for l in body_lines_raw:
-            body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
-    elif len(body_lines) > 6 and font_body:
-        font_body = find_korean_font(40)
-        body_lines = []
-        for l in body_lines_raw:
-            body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
-
-    # ── 영어 파싱 (해시태그 제외, 이모지 제거) ──
-    en_lines = []
-    if text_en and font_en:
-        en_raw = [l.strip() for l in text_en.split('\n')
-                  if l.strip() and not l.strip().startswith('#')]
-        en_lines_raw = [strip_emoji(l).strip() for l in en_raw if strip_emoji(l).strip()]
-        for l in en_lines_raw:
-            en_lines.extend(wrap_text(dummy_draw, l, font_en, MAX_W))
-
-    print(f"[영상] 한글 {len(body_lines)}줄, 영어 {len(en_lines)}줄, 해시태그 {len(tag_lines)}줄")
+    print(f"[영상] {len(pairs)}쌍 (한글+영어 인터리브), 해시태그 {len(tag_lines)}줄")
 
     # ── 배경 ──
     if image_path and os.path.exists(image_path):
@@ -166,75 +164,75 @@ def create_reels_video(text: str, image_path: str = None,
         bg = create_gradient_bg(W, H)
 
     # ── 레이아웃 계산 ──
-    body_lh = int(size_of(font_body) * 1.5) if font_body else 60
-    tag_lh  = int(size_of(font_tag)  * 1.5) if font_tag  else 40
-    en_lh   = int(size_of(font_en)   * 1.5) if font_en   else 38
-    en_gap  = 28 if en_lines else 0   # 한글-영어 구분 여백
+    body_lh  = int(size_of(font_body) * 1.5) if font_body else 58
+    tag_lh   = int(size_of(font_tag)  * 1.5) if font_tag  else 36
+    en_lh    = int(size_of(font_en)   * 1.5) if font_en   else 34
+    KO_EN_GAP = 4    # 한글 줄과 그 아래 영어 줄 사이
+    PAIR_GAP  = 20   # 쌍(pair)과 다음 쌍 사이
 
-    total_h = (len(body_lines) * body_lh
-               + en_gap + len(en_lines) * en_lh
-               + (20 if tag_lines else 0) + len(tag_lines) * tag_lh)
+    total_h = 0
+    for ko_w, en_w in pairs:
+        total_h += len(ko_w) * body_lh
+        if en_w:
+            total_h += KO_EN_GAP + len(en_w) * en_lh
+    total_h += PAIR_GAP * max(0, len(pairs) - 1)
+    total_h += (20 + len(tag_lines) * tag_lh) if tag_lines else 0
     y0 = max(PADDING, (H - total_h) // 2)
 
-    total_lines = len(body_lines) + len(en_lines) + len(tag_lines)
+    # 애니메이션 타이밍용 총 유닛 수
+    total_units = sum(len(ko) + len(en) for ko, en in pairs) + len(tag_lines)
+
+    def draw_text_line(draw, line, font, color, y_pos, alpha):
+        try:
+            tw = int(draw.textlength(line, font=font))
+        except:
+            tw = len(line) * size_of(font)
+        x = max(PADDING, (W - tw) // 2)
+        draw.text((x + 2, y_pos + 2), line, font=font, fill=(0, 0, 0, alpha // 2))
+        draw.text((x, y_pos), line, font=font, fill=(*color, alpha))
 
     def make_frame(i):
-        t = i / (FPS * duration)  # 0.0 → 1.0
+        t = i / (FPS * duration)
         frame = bg.copy().convert('RGBA')
         overlay = Image.new('RGBA', (W, H), (0, 0, 0, 155))
         frame = Image.alpha_composite(frame, overlay)
         draw = ImageDraw.Draw(frame)
 
         y = y0
+        unit_idx = 0
 
-        # 한글 본문 (흰색)
-        for j, line in enumerate(body_lines):
-            reveal_t = (j / max(total_lines, 1)) * 0.4
-            raw_a = (t - reveal_t) / 0.08
-            alpha = int(max(0.0, min(1.0, raw_a)) * 255)
-            if alpha > 0 and font_body:
-                try:
-                    tw = int(draw.textlength(line, font=font_body))
-                except:
-                    tw = len(line) * size_of(font_body)
-                x = max(PADDING, (W - tw) // 2)
-                draw.text((x + 2, y + 2), line, font=font_body, fill=(0, 0, 0, alpha // 2))
-                draw.text((x, y), line, font=font_body, fill=(255, 255, 255, alpha))
-            y += body_lh
+        # 인터리브: 한글 → 영어 → 한글 → 영어 ...
+        for p_idx, (ko_lines, en_lines) in enumerate(pairs):
+            for line in ko_lines:
+                reveal_t = (unit_idx / max(total_units, 1)) * 0.4
+                alpha = int(max(0.0, min(1.0, (t - reveal_t) / 0.08)) * 255)
+                if alpha > 0 and font_body:
+                    draw_text_line(draw, line, font_body, (255, 255, 255), y, alpha)
+                y += body_lh
+                unit_idx += 1
 
-        # 영어 번역 (구분 여백 + 연한 회백색)
-        y += en_gap
-        for j, line in enumerate(en_lines):
-            k = len(body_lines) + j
-            reveal_t = (k / max(total_lines, 1)) * 0.4
-            raw_a = (t - reveal_t) / 0.08
-            alpha = int(max(0.0, min(1.0, raw_a)) * 255)
-            if alpha > 0 and font_en:
-                try:
-                    tw = int(draw.textlength(line, font=font_en))
-                except:
-                    tw = len(line) * size_of(font_en)
-                x = max(PADDING, (W - tw) // 2)
-                draw.text((x + 1, y + 1), line, font=font_en, fill=(0, 0, 0, alpha // 3))
-                draw.text((x, y), line, font=font_en, fill=(200, 200, 200, alpha))
-            y += en_lh
+            if en_lines:
+                y += KO_EN_GAP
+                for line in en_lines:
+                    reveal_t = (unit_idx / max(total_units, 1)) * 0.4
+                    alpha = int(max(0.0, min(1.0, (t - reveal_t) / 0.08)) * 255)
+                    if alpha > 0 and font_en:
+                        draw_text_line(draw, line, font_en, (200, 200, 200), y, alpha)
+                    y += en_lh
+                    unit_idx += 1
+
+            if p_idx < len(pairs) - 1:
+                y += PAIR_GAP
 
         # 해시태그 (연파랑)
         y += 20
-        for j, line in enumerate(tag_lines):
-            k = len(body_lines) + len(en_lines) + j
-            reveal_t = (k / max(total_lines, 1)) * 0.4
-            raw_a = (t - reveal_t) / 0.08
-            alpha = int(max(0.0, min(1.0, raw_a)) * 255)
+        for line in tag_lines:
+            reveal_t = (unit_idx / max(total_units, 1)) * 0.4
+            alpha = int(max(0.0, min(1.0, (t - reveal_t) / 0.08)) * 255)
             if alpha > 0 and font_tag:
-                try:
-                    tw = int(draw.textlength(line, font=font_tag))
-                except:
-                    tw = len(line) * size_of(font_tag)
-                x = max(PADDING, (W - tw) // 2)
-                draw.text((x + 2, y + 2), line, font=font_tag, fill=(0, 0, 0, alpha // 2))
-                draw.text((x, y), line, font=font_tag, fill=(180, 220, 255, alpha))
+                draw_text_line(draw, line, font_tag, (180, 220, 255), y, alpha)
             y += tag_lh
+            unit_idx += 1
 
         return np.array(frame.convert('RGB'))
 
