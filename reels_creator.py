@@ -121,8 +121,9 @@ def create_reels_video(text: str, image_path: str = None,
                   if l.strip() and not l.strip().startswith('#')]
         en_lines_raw = [strip_emoji(l).strip() for l in en_raw if strip_emoji(l).strip()]
 
-    # 쌍 수 기준으로 폰트 크기 결정
-    n_pairs = max(len(body_lines_raw), len(en_lines_raw), 1)
+    # 줄 수 불일치 방지: min() 기준으로 완전한 쌍만 사용
+    n_pairs = min(len(body_lines_raw), len(en_lines_raw)) if (text_en and en_lines_raw) else len(body_lines_raw)
+    n_pairs = max(n_pairs, 1)
     if n_pairs <= 5:
         ko_size, en_size = 42, 26
     elif n_pairs <= 7:
@@ -134,15 +135,20 @@ def create_reels_video(text: str, image_path: str = None,
     font_tag  = find_korean_font(26)
     font_en   = find_korean_font(en_size) if text_en else None
 
-    # ── 인터리브 쌍 구성: [(ko_wrapped_lines, en_wrapped_lines), ...] ──
+    # ── 인터리브 쌍 구성: 한글·영어 줄 수가 같은 범위만 쌍으로 묶음 ──
     pairs = []
-    for i in range(max(len(body_lines_raw), len(en_lines_raw))):
-        ko = body_lines_raw[i] if i < len(body_lines_raw) else ""
-        en = en_lines_raw[i]   if i < len(en_lines_raw)   else ""
-        ko_w = wrap_text(dummy_draw, ko, font_body, MAX_W) if ko else []
-        en_w = wrap_text(dummy_draw, en, font_en,  MAX_W) if (en and font_en) else []
-        if ko_w or en_w:
+    pair_count = min(len(body_lines_raw), len(en_lines_raw)) if (text_en and en_lines_raw) else 0
+    for i in range(pair_count):
+        ko_w = wrap_text(dummy_draw, body_lines_raw[i], font_body, MAX_W)
+        en_w = wrap_text(dummy_draw, en_lines_raw[i], font_en, MAX_W) if font_en else []
+        if ko_w:
             pairs.append((ko_w, en_w))
+    # 영어 없는 경우 한글만 표시
+    if not pairs:
+        for l in body_lines_raw:
+            ko_w = wrap_text(dummy_draw, l, font_body, MAX_W)
+            if ko_w:
+                pairs.append((ko_w, []))
 
     # 해시태그 줄바꿈
     tag_lines = []
