@@ -16,11 +16,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install system fonts (Korean)
+      - name: Install system fonts (Korean) and ffmpeg
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y fonts-nanum fonts-nanum-coding ffmpeg
           fc-cache -fv
+          echo "=== Nanum 폰트 파일 확인 ==="
+          find /usr/share/fonts -name "*anum*" -o -name "*Nanum*" 2>/dev/null | sort
 
       - name: Install Python dependencies
         run: |
