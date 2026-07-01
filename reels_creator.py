@@ -125,11 +125,11 @@ def create_reels_video(text: str, image_path: str = None,
     n_pairs = min(len(body_lines_raw), len(en_lines_raw)) if (text_en and en_lines_raw) else len(body_lines_raw)
     n_pairs = max(n_pairs, 1)
     if n_pairs <= 5:
-        ko_size, en_size = 42, 26
+        ko_size, en_size = 40, 28
     elif n_pairs <= 7:
-        ko_size, en_size = 38, 24
+        ko_size, en_size = 36, 28
     else:
-        ko_size, en_size = 34, 22
+        ko_size, en_size = 32, 24
 
     font_body = find_korean_font(ko_size)
     font_tag  = find_korean_font(26)
