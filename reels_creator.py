@@ -75,6 +75,47 @@ def size_of(font):
     except:
         return 20
 
+def generate_ambient_bgm(output_path="bgm_ambient.wav", duration=22, sample_rate=44100):
+    """Am 코드 기반 잔잔한 ambient 배경음 생성. numpy + wave 만 사용."""
+    import wave as _wave
+
+    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+
+    # Am 코드: A2(베이스) + A3 + C4 + E4 + A4
+    notes = [
+        (110.00, 0.10),  # A2 bass
+        (220.00, 0.22),  # A3
+        (261.63, 0.18),  # C4
+        (329.63, 0.15),  # E4
+        (440.00, 0.10),  # A4
+    ]
+    audio = np.zeros(len(t))
+    for freq, amp in notes:
+        vib = 1 + 0.003 * np.sin(2 * np.pi * 4.5 * t)   # 약한 vibrato
+        audio += amp * np.sin(2 * np.pi * freq * vib * t)
+        audio += (amp * 0.25) * np.sin(2 * np.pi * freq * 2 * vib * t)  # 2배음
+
+    # 2초 fade in / 2초 fade out
+    fade = int(sample_rate * 2)
+    audio[:fade]  *= np.linspace(0, 1, fade)
+    audio[-fade:] *= np.linspace(1, 0, fade)
+
+    # normalize → 45% 볼륨 (moviepy에서 volumex(0.3) 추가 적용됨)
+    mx = np.max(np.abs(audio))
+    if mx > 0:
+        audio = audio / mx * 0.45
+
+    samples = (audio * 32767).astype(np.int16)
+    with _wave.open(output_path, 'w') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(samples.tobytes())
+
+    print(f"[BGM] 생성 완료: {output_path} ({duration}초, Am 코드 ambient)")
+    return output_path
+
+
 def create_gradient_bg(width=1080, height=1920, c1=(15, 15, 35), c2=(50, 20, 80)):
     arr = np.zeros((height, width, 3), dtype=np.uint8)
     for y in range(height):
@@ -246,7 +287,7 @@ def create_reels_video(text: str, image_path: str = None,
 
     clip = ImageSequenceClip(frames, fps=FPS)
     if bgm_path and os.path.exists(bgm_path):
-        audio = AudioFileClip(bgm_path).subclip(0, duration).volumex(0.25)
+        audio = AudioFileClip(bgm_path).subclip(0, duration).volumex(0.30)
         clip = clip.set_audio(audio)
 
     clip.write_videofile(output_path, fps=FPS, codec='libx264',
