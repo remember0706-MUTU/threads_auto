@@ -1,6 +1,64 @@
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os
+import glob as _glob
+
+def find_korean_font(size):
+    """한국어 지원 폰트를 찾아 반환. 없으면 None."""
+    candidates = [
+        '/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
+        'C:/Windows/Fonts/malgunbd.ttf',
+        'C:/Windows/Fonts/malgun.ttf',
+        '/System/Library/Fonts/Supplemental/AppleGothic.ttf',
+    ]
+    # glob으로 Nanum 폰트 추가 탐색
+    candidates += _glob.glob('/usr/share/fonts/**/*Nanum*Bold*.ttf', recursive=True)
+    candidates += _glob.glob('/usr/share/fonts/**/*Nanum*.ttf', recursive=True)
+    candidates += _glob.glob('/usr/share/fonts/**/*nanum*.ttf', recursive=True)
+
+    for p in candidates:
+        if p and os.path.exists(p):
+            try:
+                font = ImageFont.truetype(p, size)
+                print(f"[폰트] 로드 성공: {p} (size={size})")
+                return font
+            except Exception as e:
+                print(f"[폰트] 실패: {p} → {e}")
+    print(f"[폰트 경고] 한국어 폰트 없음! size={size}")
+    return None
+
+def wrap_text(draw, text, font, max_w):
+    """텍스트를 max_w 픽셀 이내로 줄바꿈. 폰트 없으면 그냥 반환."""
+    if font is None:
+        return [text]
+    result, cur = [], ""
+    for ch in text:
+        test = cur + ch
+        try:
+            w = draw.textlength(test, font=font)
+        except:
+            try:
+                bb = draw.textbbox((0, 0), test, font=font)
+                w = bb[2] - bb[0]
+            except:
+                w = len(test) * size_of(font)
+        if w > max_w and cur:
+            result.append(cur)
+            cur = ch
+        else:
+            cur = test
+    if cur:
+        result.append(cur)
+    return result or [text]
+
+def size_of(font):
+    try:
+        return font.size
+    except:
+        return 20
 
 def create_gradient_bg(width=1080, height=1920, c1=(15, 15, 35), c2=(50, 20, 80)):
     arr = np.zeros((height, width, 3), dtype=np.uint8)
@@ -9,180 +67,127 @@ def create_gradient_bg(width=1080, height=1920, c1=(15, 15, 35), c2=(50, 20, 80)
         arr[y] = [int(c1[i]*(1-t) + c2[i]*t) for i in range(3)]
     return Image.fromarray(arr)
 
-def find_font(size):
-    paths = [
-        '/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf',
-        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
-        'C:/Windows/Fonts/malgunbd.ttf',
-        'C:/Windows/Fonts/malgun.ttf',
-        '/System/Library/Fonts/Supplemental/AppleGothic.ttf',
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            try:
-                return ImageFont.truetype(p, size)
-            except:
-                continue
-    return ImageFont.load_default()
-
-def measure_text(draw, text, font):
-    try:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0]
-    except:
-        return len(text) * (font.size if hasattr(font, 'size') else 20)
-
-def wrap_line(draw, text, font, max_width):
-    """한 줄 텍스트를 max_width 픽셀 이내로 자동 줄바꿈."""
-    if measure_text(draw, text, font) <= max_width:
-        return [text]
-    result = []
-    current = ""
-    for char in text:
-        test = current + char
-        if measure_text(draw, test, font) > max_width:
-            if current:
-                result.append(current)
-            current = char
-        else:
-            current = test
-    if current:
-        result.append(current)
-    return result
-
-def prepare_lines(draw, text, max_width, body_font, tag_font):
-    """텍스트를 본문줄과 해시태그줄로 분리 후 각각 줄바꿈."""
-    raw_lines = [l for l in text.split('\n') if l.strip()]
-    body_lines = []
-    tag_lines = []
-    for line in raw_lines:
-        if line.strip().startswith('#'):
-            tag_lines.extend(wrap_line(draw, line.strip(), tag_font, max_width))
-        else:
-            body_lines.extend(wrap_line(draw, line.strip(), body_font, max_width))
-
-    # 해시태그가 없으면 마지막 줄에서 # 찾아 분리
-    if not tag_lines and body_lines:
-        last = body_lines[-1]
-        if '#' in last:
-            idx = last.index('#')
-            before = last[:idx].strip()
-            tags = last[idx:].strip()
-            body_lines[-1:] = ([before] if before else [])
-            tag_lines.extend(wrap_line(draw, tags, tag_font, max_width))
-
-    return body_lines, tag_lines
-
-def render_frame(bg, body_lines, tag_lines, progress, W=1080, H=1920):
-    frame = bg.copy().convert('RGBA')
-    overlay = Image.new('RGBA', (W, H), (0, 0, 0, 160))
-    frame = Image.alpha_composite(frame, overlay)
-    draw = ImageDraw.Draw(frame)
-
-    PADDING = 60          # 좌우 여백
-    max_width = W - PADDING * 2
-
-    # 폰트 크기: 본문 줄 수에 따라 동적 조정
-    body_count = len(body_lines)
-    if body_count <= 4:
-        body_size, body_lh = 56, 80
-    elif body_count <= 6:
-        body_size, body_lh = 48, 70
-    elif body_count <= 8:
-        body_size, body_lh = 42, 62
-    else:
-        body_size, body_lh = 36, 54
-
-    tag_size, tag_lh = 30, 46
-
-    font_body = find_font(body_size)
-    font_tag  = find_font(tag_size)
-
-    # 본문/태그가 아직 기본 폰트 사이즈로 측정된 거라면 재측정 후 재래핑
-    body_lines_final = []
-    for l in body_lines:
-        body_lines_final.extend(wrap_line(draw, l, font_body, max_width))
-    tag_lines_final = []
-    for l in tag_lines:
-        tag_lines_final.extend(wrap_line(draw, l, font_tag, max_width))
-
-    # 전체 높이 계산해서 수직 중앙 배치
-    total_h = (len(body_lines_final) * body_lh
-               + (20 if tag_lines_final else 0)
-               + len(tag_lines_final) * tag_lh)
-    y0 = max(80, (H - total_h) // 2 - 40)
-    all_count = len(body_lines_final) + len(tag_lines_final)
-
-    def draw_line(text, x, y, font, alpha, color=(255, 255, 255)):
-        a = int(alpha)
-        draw.text((x+2, y+2), text, font=font, fill=(0, 0, 0, a // 2))
-        draw.text((x, y), text, font=font, fill=(*color, a))
-
-    idx = 0
-    y = y0
-
-    # 본문 줄
-    for i, line in enumerate(body_lines_final):
-        reveal_at = i / max(all_count, 1)
-        raw_alpha = (progress - reveal_at) / (1.0 / max(all_count, 1)) * 2
-        alpha = int(max(0, min(1, raw_alpha)) * 255)
-        if alpha > 0:
-            tw = measure_text(draw, line, font_body)
-            x = max(PADDING, (W - tw) // 2)
-            draw_line(line, x, y, font_body, alpha)
-        y += body_lh
-        idx += 1
-
-    y += 20  # 본문-해시태그 간격
-
-    # 해시태그 줄
-    for i, line in enumerate(tag_lines_final):
-        j = len(body_lines_final) + i
-        reveal_at = j / max(all_count, 1)
-        raw_alpha = (progress - reveal_at) / (1.0 / max(all_count, 1)) * 2
-        alpha = int(max(0, min(1, raw_alpha)) * 255)
-        if alpha > 0:
-            tw = measure_text(draw, line, font_tag)
-            x = max(PADDING, (W - tw) // 2)
-            draw_line(line, x, y, font_tag, alpha, color=(200, 230, 255))
-        y += tag_lh
-        idx += 1
-
-    return np.array(frame.convert('RGB'))
-
 def create_reels_video(text: str, image_path: str = None,
                        output_path: str = "reels_output.mp4",
                        bgm_path: str = None, duration: int = 18) -> str:
     from moviepy.editor import ImageSequenceClip, AudioFileClip
 
     W, H, FPS = 1080, 1920, 24
-    total = FPS * duration
+    PADDING = 70
+    MAX_W = W - PADDING * 2
 
-    # 배경 이미지
+    # ── 폰트 먼저 탐색 ──
+    font_body = find_korean_font(52)
+    font_tag  = find_korean_font(32)
+
+    # ── 텍스트 파싱 ──
+    dummy_img  = Image.new('RGB', (W, H))
+    dummy_draw = ImageDraw.Draw(dummy_img)
+
+    raw_lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+    body_lines_raw, tag_lines_raw = [], []
+    for line in raw_lines:
+        if line.startswith('#'):
+            tag_lines_raw.append(line)
+        else:
+            body_lines_raw.append(line)
+
+    # 해시태그가 별도 줄 없으면 마지막 본문에서 분리
+    if not tag_lines_raw and body_lines_raw:
+        last = body_lines_raw[-1]
+        idx = last.find('#')
+        if idx != -1:
+            before = last[:idx].strip()
+            body_lines_raw[-1:] = [before] if before else []
+            tag_lines_raw = [last[idx:].strip()]
+
+    # 줄바꿈 적용
+    body_lines = []
+    for l in body_lines_raw:
+        body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
+    tag_lines = []
+    for l in tag_lines_raw:
+        tag_lines.extend(wrap_text(dummy_draw, l, font_tag, MAX_W))
+
+    # 줄 수가 너무 많으면 폰트 줄임
+    if len(body_lines) > 9 and font_body:
+        font_body = find_korean_font(40)
+        body_lines = []
+        for l in body_lines_raw:
+            body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
+    elif len(body_lines) > 6 and font_body:
+        font_body = find_korean_font(46)
+        body_lines = []
+        for l in body_lines_raw:
+            body_lines.extend(wrap_text(dummy_draw, l, font_body, MAX_W))
+
+    print(f"[영상] 본문 {len(body_lines)}줄, 해시태그 {len(tag_lines)}줄")
+
+    # ── 배경 ──
     if image_path and os.path.exists(image_path):
         bg = Image.open(image_path).convert('RGB')
         iw, ih = bg.size
         scale = max(W / iw, H / ih)
-        bg = bg.resize((int(iw*scale), int(ih*scale)), Image.LANCZOS)
+        bg = bg.resize((int(iw * scale), int(ih * scale)), Image.LANCZOS)
         left = (bg.width - W) // 2
         top  = (bg.height - H) // 2
-        bg = bg.crop((left, top, left+W, top+H))
+        bg = bg.crop((left, top, left + W, top + H))
     else:
         bg = create_gradient_bg(W, H)
 
-    # 텍스트 미리 파싱 (dummy draw로 측정)
-    dummy_img  = Image.new('RGB', (W, H))
-    dummy_draw = ImageDraw.Draw(dummy_img)
-    font_body_tmp = find_font(56)
-    font_tag_tmp  = find_font(30)
-    body_lines, tag_lines = prepare_lines(
-        dummy_draw, text, W - 120, font_body_tmp, font_tag_tmp
-    )
+    # ── 레이아웃 계산 ──
+    body_lh = int(size_of(font_body) * 1.5) if font_body else 60
+    tag_lh  = int(size_of(font_tag)  * 1.5) if font_tag  else 40
+    total_h = len(body_lines) * body_lh + (24 if tag_lines else 0) + len(tag_lines) * tag_lh
+    y0 = max(PADDING, (H - total_h) // 2)
 
-    frames = []
-    for i in range(total):
-        progress = min(i / (total * 0.75), 1.0)
-        frames.append(render_frame(bg, body_lines, tag_lines, progress, W, H))
+    total_lines = len(body_lines) + len(tag_lines)
+
+    def make_frame(i):
+        t = i / (FPS * duration)  # 0.0 → 1.0
+        # 각 줄은 순서대로 등장: 40% 시점까지 전체 텍스트가 다 나타남
+        frame = bg.copy().convert('RGBA')
+        overlay = Image.new('RGBA', (W, H), (0, 0, 0, 155))
+        frame = Image.alpha_composite(frame, overlay)
+        draw = ImageDraw.Draw(frame)
+
+        y = y0
+        for j, line in enumerate(body_lines):
+            reveal_t = (j / max(total_lines, 1)) * 0.4  # 40% 시점에 마지막 줄 등장
+            fade_dur = 0.08
+            raw_a = (t - reveal_t) / fade_dur
+            alpha = int(max(0.0, min(1.0, raw_a)) * 255)
+            if alpha > 0 and font_body:
+                try:
+                    tw = int(draw.textlength(line, font=font_body))
+                except:
+                    tw = len(line) * size_of(font_body)
+                x = max(PADDING, (W - tw) // 2)
+                draw.text((x + 2, y + 2), line, font=font_body, fill=(0, 0, 0, alpha // 2))
+                draw.text((x, y), line, font=font_body, fill=(255, 255, 255, alpha))
+            y += body_lh
+
+        y += 24
+        for j, line in enumerate(tag_lines):
+            k = len(body_lines) + j
+            reveal_t = (k / max(total_lines, 1)) * 0.4
+            fade_dur = 0.08
+            raw_a = (t - reveal_t) / fade_dur
+            alpha = int(max(0.0, min(1.0, raw_a)) * 255)
+            if alpha > 0 and font_tag:
+                try:
+                    tw = int(draw.textlength(line, font=font_tag))
+                except:
+                    tw = len(line) * size_of(font_tag)
+                x = max(PADDING, (W - tw) // 2)
+                draw.text((x + 2, y + 2), line, font=font_tag, fill=(0, 0, 0, alpha // 2))
+                draw.text((x, y), line, font=font_tag, fill=(180, 220, 255, alpha))
+            y += tag_lh
+
+        return np.array(frame.convert('RGB'))
+
+    frames = [make_frame(i) for i in range(FPS * duration)]
 
     clip = ImageSequenceClip(frames, fps=FPS)
     if bgm_path and os.path.exists(bgm_path):
