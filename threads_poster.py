@@ -57,6 +57,19 @@ def post_to_threads(text: str, image_url: str = None, reply_text: str = None) ->
                 print("[오류] 세션 만료")
                 return False
 
+            # 로그인된 사용자명 추출 (프로필 링크에서)
+            username = page.evaluate("""() => {
+                const links = document.querySelectorAll('a[href^="/@"]');
+                for (const link of links) {
+                    const href = link.getAttribute('href');
+                    if (href && /^\\/@[\\w.]+$/.test(href)) {
+                        return href.slice(2);
+                    }
+                }
+                return null;
+            }""")
+            print(f"[사용자] {username or '추출 실패'}")
+
             # "새로운 소식이 있나요?" 버튼 클릭
             page.evaluate("""() => {
                 const btns = Array.from(document.querySelectorAll('[role="button"]'));
@@ -142,8 +155,10 @@ def post_to_threads(text: str, image_url: str = None, reply_text: str = None) ->
                 print("[답글] 영어 답글 시작...")
                 time.sleep(3)
 
-                # 홈피드 새로고침해서 방금 올린 포스트 상단에 표시
-                page.goto("https://www.threads.com", timeout=30000)
+                # 내 프로필 페이지로 이동 — 첫 번째 포스트가 방금 올린 글
+                profile_url = f"https://www.threads.com/@{username}" if username else "https://www.threads.com"
+                print(f"[답글] 이동: {profile_url}")
+                page.goto(profile_url, timeout=30000)
                 page.wait_for_load_state("domcontentloaded", timeout=15000)
                 time.sleep(4)
 
