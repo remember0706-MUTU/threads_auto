@@ -1,8 +1,6 @@
 name: Instagram Reels Auto Post
 
 on:
-  schedule:
-    - cron: '0 1 * * *'   # 매일 한국시간 오전 10시 (UTC 01:00)
   workflow_dispatch:
 
 jobs:
