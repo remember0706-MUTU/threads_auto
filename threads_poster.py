@@ -190,15 +190,18 @@ def post_to_threads(text: str, image_url: str = None, reply_text: str = None) ->
                         reply_editor.wait_for(state="visible", timeout=8000)
                         reply_editor.click()
                         time.sleep(0.5)
-                        # execCommand 방식 — 긴 텍스트도 누락 없이 한 번에 삽입
-                        page.evaluate("""(text) => {
-                            const editors = document.querySelectorAll('[contenteditable="true"]');
-                            const editor = editors[editors.length - 1];
-                            if (!editor) return;
-                            editor.focus();
-                            document.execCommand('selectAll', false, null);
-                            document.execCommand('insertText', false, text);
-                        }""", reply_text)
+                        # 줄별로 execCommand 삽입 + Enter 키로 줄바꿈 처리
+                        lines = reply_text.split('\n')
+                        for i, line in enumerate(lines):
+                            page.evaluate("""(text) => {
+                                const editors = document.querySelectorAll('[contenteditable="true"]');
+                                const editor = editors[editors.length - 1];
+                                if (!editor) return;
+                                editor.focus();
+                                document.execCommand('insertText', false, text);
+                            }""", line)
+                            if i < len(lines) - 1:
+                                page.keyboard.press("Enter")
                         time.sleep(1.5)
 
                         page.screenshot(path="screenshot_5c_reply_typed.png", full_page=False)
