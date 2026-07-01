@@ -1,6 +1,7 @@
 import requests
 import random
 from config import PEXELS_API_KEY
+from datetime import date
 
 KEYWORD_MAP = {
     # 라이프스타일
@@ -22,11 +23,11 @@ KEYWORD_MAP = {
     "챗GPT": "ai chatbot technology",
     "스마트폰": "smartphone technology",
     "일상공감": "everyday life",
-    # 명언 카테고리
-    "인생격언": "inspiration wisdom sky",
-    "힘내는말": "motivation sunrise hope",
-    "좋은말": "positive morning sunshine flowers",
-    "깨달음": "peaceful meditation nature calm",
+    # 명언 카테고리 — 매번 랜덤으로 다양한 배경이 나오도록 후보 키워드 목록 사용
+    "인생격언": ["mountain peak", "city lights night", "open road", "starry sky", "forest path"],
+    "힘내는말": ["sunrise ocean", "running track", "green field", "warm light window", "rainy day coffee"],
+    "좋은말": ["morning light", "peaceful lake", "autumn leaves", "summer beach", "colorful sky sunset"],
+    "깨달음": ["misty forest", "desert dunes", "snowy mountain", "calm river", "stone path garden"],
 }
 
 
@@ -39,7 +40,12 @@ def search_pexels_image(keyword: str) -> dict:
         return None
 
     headers = {"Authorization": PEXELS_API_KEY}
-    en_keyword = KEYWORD_MAP.get(keyword, keyword)
+    raw = KEYWORD_MAP.get(keyword, keyword)
+    if isinstance(raw, list):
+        # 날짜 기반으로 매일 다른 키워드 선택 (같은 날은 동일)
+        en_keyword = raw[date.today().toordinal() % len(raw)]
+    else:
+        en_keyword = raw
 
     params = {
         "query": en_keyword,
