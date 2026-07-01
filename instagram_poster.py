@@ -5,7 +5,7 @@ SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instagr
 
 def check_session() -> bool:
     if not os.path.exists(SESSION_FILE):
-        print("[오류] instagram_session.json 없음. save_instagram_session.py 먼저 실행하세요.")
+        print("[오류] instagram_session.json 없음.")
         return False
     return True
 
@@ -37,7 +37,7 @@ def post_reel(video_path: str, caption: str) -> bool:
                 print("[오류] 세션 만료")
                 return False
 
-            # Click "+" New post button
+            # "+" New post 버튼 클릭
             result = page.evaluate("""() => {
                 const svgs = document.querySelectorAll('svg[aria-label]');
                 for (const svg of svgs) {
@@ -47,39 +47,75 @@ def post_reel(video_path: str, caption: str) -> bool:
                         if (btn) { btn.click(); return 'CLICKED:' + label; }
                     }
                 }
-                // fallback: find by href or data attributes
                 const links = document.querySelectorAll('a[href="/create/"]');
                 if (links.length) { links[0].click(); return 'CLICKED:link'; }
                 return 'NOT_FOUND';
             }""")
             print(f"[생성 버튼] {result}")
-            time.sleep(2)
+            time.sleep(3)
             page.screenshot(path="ig_2_menu.png")
 
-            # Make file input visible and upload
+            # "Post" 또는 "게시물" 선택 (Type 선택 모달이 뜨는 경우)
             page.evaluate("""() => {
-                const inputs = document.querySelectorAll('input[type="file"]');
-                inputs.forEach(inp => {
-                    inp.style.display = 'block';
-                    inp.style.opacity = '1';
-                    inp.style.position = 'static';
-                });
+                const btns = Array.from(document.querySelectorAll('[role="menuitem"], [role="button"], a'));
+                for (const btn of btns) {
+                    const t = btn.textContent?.trim();
+                    if (t === 'Post' || t === '게시물') { btn.click(); return; }
+                }
             }""")
-            time.sleep(0.5)
+            time.sleep(2)
 
-            file_input = page.locator('input[type="file"]').first
-            if file_input.count() > 0:
-                file_input.set_input_files(abs_video)
-                print(f"[업로드] {abs_video}")
-                time.sleep(6)
-            else:
-                print("[오류] file input 없음")
-                return False
+            # "Select from computer" 버튼 클릭 → file chooser 인터셉트
+            print("[파일 업로드] Select from computer 클릭 시도...")
+            try:
+                with page.expect_file_chooser(timeout=10000) as fc_info:
+                    clicked = page.evaluate("""() => {
+                        const btns = Array.from(document.querySelectorAll('[role="button"], button'));
+                        for (const btn of btns) {
+                            const t = btn.textContent?.trim();
+                            if (t === 'Select from computer' || t === '컴퓨터에서 선택') {
+                                btn.click();
+                                return 'CLICKED:' + t;
+                            }
+                        }
+                        const allBtns = document.querySelectorAll('[role="button"]');
+                        for (const btn of allBtns) {
+                            if (btn.textContent?.includes('computer') || btn.textContent?.includes('컴퓨터')) {
+                                btn.click();
+                                return 'CLICKED:fallback';
+                            }
+                        }
+                        return 'NOT_FOUND';
+                    }""")
+                    print(f"[Select from computer] {clicked}")
+                file_chooser = fc_info.value
+                file_chooser.set_files(abs_video)
+                print(f"[업로드] 파일 설정 완료: {abs_video}")
+            except Exception as fe:
+                print(f"[파일 chooser 실패] {fe} - fallback: hidden input 시도")
+                page.evaluate("""() => {
+                    const inputs = document.querySelectorAll('input[type="file"]');
+                    inputs.forEach(inp => {
+                        inp.style.display = 'block';
+                        inp.style.opacity = '1';
+                        inp.style.position = 'static';
+                        inp.removeAttribute('hidden');
+                    });
+                }""")
+                time.sleep(0.5)
+                file_input = page.locator('input[type="file"]').first
+                if file_input.count() > 0:
+                    file_input.set_input_files(abs_video)
+                    print("[업로드] fallback 성공")
+                else:
+                    print("[오류] file input 없음")
+                    page.screenshot(path="ig_error_noinput.png")
+                    return False
 
+            time.sleep(6)
             page.screenshot(path="ig_3_uploaded.png")
 
-            # Handle crop/format popup - click OK if appears
-            time.sleep(2)
+            # 비율 조정 팝업 OK
             page.evaluate("""() => {
                 const btns = Array.from(document.querySelectorAll('[role="button"]'));
                 for (const btn of btns) {
@@ -89,7 +125,7 @@ def post_reel(video_path: str, caption: str) -> bool:
             }""")
             time.sleep(1)
 
-            # Click Next/다음 up to 3 times (crop → filter → caption)
+            # Next / 다음 최대 3번
             for step in range(3):
                 nexted = page.evaluate("""() => {
                     const btns = Array.from(document.querySelectorAll('[role="button"]'));
@@ -105,15 +141,14 @@ def post_reel(video_path: str, caption: str) -> bool:
                 if nexted == 'NOT_FOUND':
                     break
 
-            # Write caption
+            # 캡션 입력
             cap_written = page.evaluate("""(caption) => {
-                const areas = document.querySelectorAll('[aria-label*="caption"], [aria-label*="캡션"], textarea, [contenteditable="true"]');
+                const areas = document.querySelectorAll('[aria-label*="caption"], [aria-label*="Write"], textarea, [contenteditable="true"]');
                 for (const el of areas) {
-                    const label = el.getAttribute('aria-label') || '';
+                    const label = (el.getAttribute('aria-label') || '').toLowerCase();
                     const tag = el.tagName.toLowerCase();
-                    if (label.includes('caption') || label.includes('캡션') || tag === 'textarea') {
+                    if (label.includes('caption') || label.includes('write') || tag === 'textarea') {
                         el.focus();
-                        el.click();
                         document.execCommand('selectAll', false, null);
                         document.execCommand('insertText', false, caption);
                         return 'WRITTEN';
@@ -125,7 +160,7 @@ def post_reel(video_path: str, caption: str) -> bool:
             time.sleep(1)
             page.screenshot(path="ig_4_caption.png")
 
-            # Click Share / 공유
+            # Share / 공유
             shared = page.evaluate("""() => {
                 const btns = Array.from(document.querySelectorAll('[role="button"]'));
                 const shareBtns = btns.filter(b => {
