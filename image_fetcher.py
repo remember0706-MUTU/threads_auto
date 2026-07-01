@@ -23,11 +23,17 @@ KEYWORD_MAP = {
     "챗GPT": "ai chatbot technology",
     "스마트폰": "smartphone technology",
     "일상공감": "everyday life",
-    # 명언 카테고리 — 매번 랜덤으로 다양한 배경이 나오도록 후보 키워드 목록 사용
-    "인생격언": ["mountain peak", "city lights night", "open road", "starry sky", "forest path"],
-    "힘내는말": ["sunrise ocean", "running track", "green field", "warm light window", "rainy day coffee"],
-    "좋은말": ["morning light", "peaceful lake", "autumn leaves", "summer beach", "colorful sky sunset"],
-    "깨달음": ["misty forest", "desert dunes", "snowy mountain", "calm river", "stone path garden"],
+    # 명언 카테고리 — 날짜 기반으로 매일 다른 배경 키워드 선택
+    "인생격언":  ["mountain peak", "city lights night", "open road", "starry sky", "forest path"],
+    "힘내는말":  ["sunrise ocean", "running track", "green field", "warm light window", "rainy day coffee"],
+    "좋은말":    ["morning light", "peaceful lake", "autumn leaves", "summer beach", "colorful sky sunset"],
+    "깨달음":    ["misty forest", "desert dunes", "snowy mountain", "calm river", "stone path garden"],
+    "관계와사람": ["two people silhouette", "hands together", "friends laughing", "crowd city", "couple walking"],
+    "자기사랑":  ["mirror reflection", "woman alone nature", "self care morning", "solo hike", "bath candles"],
+    "변화와성장": ["butterfly nature", "seedling growing", "caterpillar leaf", "new beginning sunrise", "construction building"],
+    "꿈과도전":  ["athlete stadium", "climber rock", "airplane sky", "finish line race", "night study lamp"],
+    "감사와일상": ["kitchen morning coffee", "family dinner table", "dog owner park", "simple meal sunlight", "book window rain"],
+    "멘탈관리":  ["meditation yoga sunset", "deep breath nature", "journal writing", "calm water reflection", "night sky stars"],
 }
 
 
