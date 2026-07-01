@@ -14,7 +14,7 @@ from reels_creator import create_reels_video
 from instagram_poster import post_reel
 
 
-def run_instagram_reels():
+def run_instagram_reels() -> bool:
     print("\n" + "="*50)
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Instagram Reels 시작")
     print("="*50)
@@ -58,6 +58,7 @@ def run_instagram_reels():
     else:
         print("[실패] Instagram Reels 게시 실패")
     print("="*50)
+    return success
 
 
 if __name__ == "__main__":
@@ -65,4 +66,6 @@ if __name__ == "__main__":
         import subprocess
         subprocess.run([sys.executable, "save_instagram_session.py"])
     else:
-        run_instagram_reels()
+        ok = run_instagram_reels()
+        if not ok:
+            sys.exit(1)
