@@ -10,7 +10,7 @@ if sys.platform == "win32":
 
 from quote_generator import generate_quote_content, get_today_category
 from image_fetcher import search_pexels_image
-from reels_creator import create_reels_video, generate_ambient_bgm
+from reels_creator import create_reels_video
 from instagram_poster import post_reel
 
 
@@ -40,8 +40,12 @@ def run_instagram_reels() -> bool:
         except Exception as e:
             print(f"[이미지] 실패: {e}")
 
-    # 배경음악 생성 (Am 코드 ambient)
-    bgm_path = generate_ambient_bgm("bgm_ambient.wav", duration=22)
+    # 배경음악 (레포 루트의 bgm.mp3 사용)
+    bgm_path = "bgm.mp3" if os.path.exists("bgm.mp3") else None
+    if bgm_path:
+        print("[BGM] bgm.mp3 사용")
+    else:
+        print("[BGM] bgm.mp3 없음 — 무음으로 진행")
 
     # 릴스 영상 생성
     video_path = "reels_output.mp4"
