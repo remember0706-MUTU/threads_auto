@@ -40,12 +40,15 @@ def run_instagram_reels() -> bool:
         except Exception as e:
             print(f"[이미지] 실패: {e}")
 
-    # 배경음악 (레포 루트의 bgm.mp3 사용)
-    bgm_path = "bgm.mp3" if os.path.exists("bgm.mp3") else None
-    if bgm_path:
-        print("[BGM] bgm.mp3 사용")
+    # 배경음악 (bgm 폴더에서 랜덤 선택)
+    import glob, random as _random
+    bgm_files = glob.glob("bgm/*.mp3")
+    if bgm_files:
+        bgm_path = _random.choice(bgm_files)
+        print(f"[BGM] {os.path.basename(bgm_path)} 선택 ({len(bgm_files)}개 중)")
     else:
-        print("[BGM] bgm.mp3 없음 — 무음으로 진행")
+        bgm_path = None
+        print("[BGM] bgm 폴더에 mp3 없음 — 무음으로 진행")
 
     # 릴스 영상 생성
     video_path = "reels_output.mp4"
