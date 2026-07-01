@@ -224,7 +224,7 @@ def post_to_threads(text: str, image_url: str = None, reply_text: str = None) ->
                                 document.execCommand('insertText', false, text);
                             }""", line)
                             if i < len(lines) - 1:
-                                page.keyboard.press("Enter")
+                                page.keyboard.press("Shift+Enter")
                         time.sleep(1.5)
 
                         page.screenshot(path="screenshot_5c_reply_typed.png", full_page=False)
