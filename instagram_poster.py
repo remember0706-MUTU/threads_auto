@@ -194,8 +194,24 @@ def post_reel(video_path: str, caption: str) -> bool:
                 return 'CLICKED:' + shareBtns.length;
             }""")
             print(f"[공유] {shared}")
-            time.sleep(8)
-            page.screenshot(path="ig_5_shared.png")
+            if shared == 'NOT_FOUND':
+                print("[오류] Share 버튼 없음")
+                return False
+
+            # 업로드 완료 대기 (최대 60초 — 영상 서버 업로드 시간)
+            print("[대기] 업로드 완료 대기 중...")
+            for i in range(12):
+                time.sleep(5)
+                # "Sharing" 스피너가 사라지면 완료
+                still_sharing = page.evaluate("""() => {
+                    const btns = Array.from(document.querySelectorAll('[role="button"]'));
+                    return btns.some(b => b.textContent?.trim() === 'Share' || b.textContent?.trim() === '공유');
+                }""")
+                page.screenshot(path=f"ig_5_sharing_{i}.png")
+                if not still_sharing:
+                    print(f"[완료] {(i+1)*5}초 후 업로드 완료 감지!")
+                    break
+                print(f"[대기] {(i+1)*5}초 경과... (Share 버튼 {'있음' if still_sharing else '없음'})")
 
             print("[완료] Instagram 릴스 게시 성공!")
             return True
