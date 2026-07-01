@@ -35,17 +35,21 @@ def generate_quote_content():
         "- 광고 느낌 없이 진심 어린 글\n"
         "- 관련 해시태그 4~5개 마지막에 추가\n"
         "- 총 450자 이내\n\n"
-        "그리고 위 한국어 내용을 자연스러운 영어로도 번역해주세요 (text_en):\n"
+        "그리고 위 한국어 내용 전체를 영어로도 작성해주세요 (text_en):\n"
+        "- 한국어 원문과 줄 수, 구성, 흐름이 동일하게\n"
+        "- 한 줄도 빠짐없이 전부 영어로 번역\n"
         "- 직역 말고 영어 원어민이 쓸 법한 자연스러운 표현으로\n"
-        "- 이모지는 동일하게 유지\n\n"
+        "- 이모지는 동일하게 유지\n"
+        "- 해시태그도 영어로 번역 (예: #좋은말 → #goodwords)\n"
+        "- 한국어와 동일한 분량\n\n"
         "JSON으로 반환:\n"
-        '{"text": "전체 내용 (해시태그 포함)", "text_en": "English version"}'
+        '{"text": "전체 내용 (해시태그 포함)", "text_en": "Full English version (same length as Korean, all lines translated)"}'
     )
 
     try:
         message = client.messages.create(
             model="claude-opus-4-5",
-            max_tokens=1024,
+            max_tokens=1500,
             messages=[{"role": "user", "content": prompt}]
         )
         import json, re
