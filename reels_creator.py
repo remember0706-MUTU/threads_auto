@@ -5,15 +5,14 @@ import re
 import glob as _glob
 
 def strip_emoji(text):
-    """이모지 제거 — 폰트가 지원 안 해서 박스로 나오는 문자 제거."""
+    """이모지 제거 — NanumGothicBold가 지원하지 않는 이모지 제거. 한글은 보존."""
     emoji_pattern = re.compile(
         "["
-        "\U0001F300-\U0001F9FF"   # 이모지 전체 범위
-        "\U00002702-\U000027B0"
-        "\U000024C2-\U0001F251"
-        "☀-⯿"
-        "️"                   # variation selector
-        "‍"                   # zero-width joiner
+        "\U0001F300-\U0001F9FF"   # 현대 이모지 (얼굴, 동물, 음식, 심볼 등)
+        "\U0001FA00-\U0001FAFF"   # 확장 이모지 (체스, 새 심볼)
+        "\U00002600-\U000027BF"   # 기타 심볼(☀♠) + Dingbats — 한글은 U+AC00+로 이 범위 밖
+        "\U0000FE00-\U0000FE0F"   # Variation Selectors (이모지 색상 지정자)
+        "\U0000200D"              # Zero Width Joiner (합성 이모지 연결자)
         "]+",
         flags=re.UNICODE
     )
