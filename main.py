@@ -55,8 +55,8 @@ def run_good_words():
         return
 
     quote = generate_quote_content()
-    text_en = quote.get("text_en", "")
-    full_text = quote["text"] + ("\n\n" + text_en if text_en else "")
+    korean_text = quote["text"]
+    english_text = quote.get("text_en", "")
 
     # 카테고리에 맞는 Pexels 이미지 검색
     category = get_today_category()
@@ -68,7 +68,16 @@ def run_good_words():
     else:
         print("[이미지] 이미지 없이 텍스트만 포스팅")
 
-    success = post_to_threads(text=full_text, image_url=image_url)
+    if english_text:
+        print(f"[구성] 한국어 본문 + 영어 답글 형식으로 포스팅")
+    else:
+        print(f"[구성] 한국어 본문만 포스팅")
+
+    success = post_to_threads(
+        text=korean_text,
+        image_url=image_url,
+        reply_text=english_text if english_text else None
+    )
 
     if success:
         print("[완료] Good Words 포스팅 성공!")
