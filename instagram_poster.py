@@ -55,34 +55,45 @@ def post_reel(video_path: str, caption: str) -> bool:
             time.sleep(3)
             page.screenshot(path="ig_2_menu.png")
 
-            # "Post" 또는 "게시물" 선택 (Type 선택 모달이 뜨는 경우)
+            # 현재 페이지의 모든 버튼 텍스트 로깅 (디버깅)
+            btns_debug = page.evaluate("""() => {
+                const btns = Array.from(document.querySelectorAll('[role="button"], [role="menuitem"], button, a'));
+                return btns.map(b => b.textContent?.trim()).filter(t => t && t.length < 50).slice(0, 30);
+            }""")
+            print(f"[페이지 버튼 목록] {btns_debug}")
+
+            # "Post" / "게시물" / "Reel" 등 타입 선택 (모달이 뜨는 경우)
             page.evaluate("""() => {
-                const btns = Array.from(document.querySelectorAll('[role="menuitem"], [role="button"], a'));
+                const btns = Array.from(document.querySelectorAll('[role="menuitem"], [role="button"], a, li'));
                 for (const btn of btns) {
                     const t = btn.textContent?.trim();
-                    if (t === 'Post' || t === '게시물') { btn.click(); return; }
+                    if (t === 'Post' || t === '게시물' || t === 'Reel' || t === '릴스') {
+                        btn.click(); return t;
+                    }
                 }
             }""")
             time.sleep(2)
+            page.screenshot(path="ig_2b_after_type.png")
+
+            # 타입 선택 후 버튼 목록 재확인
+            btns_debug2 = page.evaluate("""() => {
+                const btns = Array.from(document.querySelectorAll('[role="button"], button'));
+                return btns.map(b => b.textContent?.trim()).filter(t => t && t.length < 80).slice(0, 20);
+            }""")
+            print(f"[타입 선택 후 버튼] {btns_debug2}")
 
             # "Select from computer" 버튼 클릭 → file chooser 인터셉트
             print("[파일 업로드] Select from computer 클릭 시도...")
             try:
                 with page.expect_file_chooser(timeout=10000) as fc_info:
                     clicked = page.evaluate("""() => {
-                        const btns = Array.from(document.querySelectorAll('[role="button"], button'));
+                        const btns = Array.from(document.querySelectorAll('[role="button"], button, div, span'));
                         for (const btn of btns) {
-                            const t = btn.textContent?.trim();
-                            if (t === 'Select from computer' || t === '컴퓨터에서 선택') {
+                            const t = (btn.textContent?.trim() || '');
+                            if (t === 'Select from computer' || t === '컴퓨터에서 선택'
+                                || t.includes('from computer') || t.includes('컴퓨터에서')) {
                                 btn.click();
                                 return 'CLICKED:' + t;
-                            }
-                        }
-                        const allBtns = document.querySelectorAll('[role="button"]');
-                        for (const btn of allBtns) {
-                            if (btn.textContent?.includes('computer') || btn.textContent?.includes('컴퓨터')) {
-                                btn.click();
-                                return 'CLICKED:fallback';
                             }
                         }
                         return 'NOT_FOUND';
