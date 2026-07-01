@@ -13,12 +13,10 @@ def check_api_connection() -> bool:
 
 
 def download_image(url: str) -> str:
-    """이미지 URL을 다운로드해서 임시 파일 경로 반환"""
     try:
         resp = requests.get(url, timeout=15)
         resp.raise_for_status()
-        suffix = ".jpg"
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
         tmp.write(resp.content)
         tmp.close()
         print(f"[이미지 다운로드] {tmp.name} ({len(resp.content)//1024}KB)")
@@ -28,9 +26,11 @@ def download_image(url: str) -> str:
         return None
 
 
-def post_to_threads(text: str, image_url: str = None) -> bool:
+def post_to_threads(text: str, image_url: str = None, reply_text: str = None) -> bool:
     if len(text) > 500:
         text = text[:497] + "..."
+    if reply_text and len(reply_text) > 500:
+        reply_text = reply_text[:497] + "..."
 
     image_path = None
     if image_url:
@@ -51,7 +51,6 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             time.sleep(5)
 
             print(f"[URL] {page.url}")
-
             page.screenshot(path="screenshot_1_loaded.png", full_page=False)
 
             if "login" in page.url or "accounts" in page.url:
@@ -84,7 +83,6 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
             # 이미지 첨부
             if image_path and os.path.exists(image_path):
                 print("[이미지] 첨부 시도...")
-                # 파일 input을 expose하고 set_input_files 사용
                 page.evaluate("""() => {
                     const inputs = document.querySelectorAll('input[type="file"]');
                     inputs.forEach(i => { i.style.display = 'block'; i.style.opacity = '1'; });
@@ -95,9 +93,8 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
                 if file_input.count() > 0:
                     file_input.set_input_files(image_path)
                     print("[이미지] 파일 설정 완료")
-                    time.sleep(4)  # 업로드 대기
+                    time.sleep(4)
                 else:
-                    # 이미지 아이콘 버튼 클릭 후 시도
                     page.evaluate("""() => {
                         const svgs = document.querySelectorAll('svg');
                         for (const svg of svgs) {
@@ -139,6 +136,70 @@ def post_to_threads(text: str, image_url: str = None) -> bool:
                 return False
 
             print(f"[성공] {text[:50]}...")
+
+            # 영어 답글 달기
+            if reply_text:
+                print("[답글] 영어 답글 시작...")
+                time.sleep(3)
+
+                # 홈피드 새로고침해서 방금 올린 포스트 상단에 표시
+                page.goto("https://www.threads.com", timeout=30000)
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                time.sleep(4)
+
+                page.screenshot(path="screenshot_5_reply_page.png", full_page=False)
+
+                # 첫 번째 포스트의 Reply 버튼 클릭
+                replied = page.evaluate("""() => {
+                    const svgs = document.querySelectorAll('svg[aria-label]');
+                    for (const svg of svgs) {
+                        const label = svg.getAttribute('aria-label');
+                        if (label === 'Reply' || label === '답글' || label === '댓글' || label === 'Comment') {
+                            const btn = svg.closest('[role="button"]') || svg.parentElement;
+                            if (btn) {
+                                btn.click();
+                                return 'CLICKED:' + label;
+                            }
+                        }
+                    }
+                    return 'NOT_FOUND';
+                }""")
+                print(f"[답글] 버튼 클릭: {replied}")
+                time.sleep(2)
+
+                page.screenshot(path="screenshot_5b_reply_open.png", full_page=False)
+
+                if 'NOT_FOUND' not in replied:
+                    try:
+                        reply_editor = page.locator('[contenteditable="true"]').last
+                        reply_editor.wait_for(state="visible", timeout=8000)
+                        reply_editor.click()
+                        time.sleep(0.5)
+                        reply_editor.press_sequentially(reply_text, delay=30)
+                        time.sleep(1.5)
+
+                        page.screenshot(path="screenshot_5c_reply_typed.png", full_page=False)
+
+                        reply_clicked = page.evaluate("""() => {
+                            const btns = Array.from(document.querySelectorAll('[role="button"]'));
+                            const postBtns = btns.filter(b => {
+                                const t = b.textContent.trim();
+                                return t === 'Post' || t === '게시' || t === 'Reply' || t === '답글';
+                            });
+                            if (postBtns.length === 0) return 'NOT_FOUND';
+                            postBtns[postBtns.length - 1].click();
+                            return 'CLICKED:' + postBtns.length;
+                        }""")
+                        print(f"[답글] 게시 클릭: {reply_clicked}")
+                        time.sleep(4)
+
+                        page.screenshot(path="screenshot_6_reply_posted.png", full_page=False)
+                        print(f"[답글 완료] {reply_text[:50]}...")
+                    except Exception as re:
+                        print(f"[답글 오류] {re} (본문 포스팅은 성공)")
+                else:
+                    print("[답글 경고] 답글 버튼을 찾지 못했습니다 (본문 포스팅은 성공)")
+
             return True
 
         except Exception as e:
