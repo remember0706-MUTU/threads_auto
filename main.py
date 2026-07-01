@@ -14,7 +14,8 @@ if sys.platform == "win32":
 from config import POST_TIMES
 from bitcoin_fetcher import get_bitcoin_price
 from content_generator import generate_threads_content
-from quote_generator import generate_quote_content
+from quote_generator import generate_quote_content, get_today_category
+from image_fetcher import search_pexels_image
 from threads_poster import post_to_threads, check_api_connection
 
 
@@ -56,7 +57,18 @@ def run_good_words():
     quote = generate_quote_content()
     text_en = quote.get("text_en", "")
     full_text = quote["text"] + ("\n\n" + text_en if text_en else "")
-    success = post_to_threads(text=full_text)
+
+    # 카테고리에 맞는 Pexels 이미지 검색
+    category = get_today_category()
+    image_info = search_pexels_image(category)
+    image_url = image_info["url"] if image_info else None
+
+    if image_url:
+        print(f"[이미지] {category} 카테고리 이미지 준비 완료")
+    else:
+        print("[이미지] 이미지 없이 텍스트만 포스팅")
+
+    success = post_to_threads(text=full_text, image_url=image_url)
 
     if success:
         print("[완료] Good Words 포스팅 성공!")
