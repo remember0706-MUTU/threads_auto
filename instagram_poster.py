@@ -37,7 +37,7 @@ def post_reel(video_path: str, caption: str) -> bool:
                 print("[오류] 세션 만료")
                 return False
 
-            # "+" New post 버튼 클릭
+            # "+" New post 버튼 클릭 (SVG aria-label 기반)
             result = page.evaluate("""() => {
                 const svgs = document.querySelectorAll('svg[aria-label]');
                 for (const svg of svgs) {
@@ -55,27 +55,34 @@ def post_reel(video_path: str, caption: str) -> bool:
             time.sleep(3)
             page.screenshot(path="ig_2_menu.png")
 
-            # 현재 페이지의 모든 버튼 텍스트 로깅 (디버깅)
+            # 버튼 목록 로깅
             btns_debug = page.evaluate("""() => {
                 const btns = Array.from(document.querySelectorAll('[role="button"], [role="menuitem"], button, a'));
-                return btns.map(b => b.textContent?.trim()).filter(t => t && t.length < 50).slice(0, 30);
+                return btns.map(b => b.textContent?.trim()).filter(t => t && t.length < 60).slice(0, 30);
             }""")
             print(f"[페이지 버튼 목록] {btns_debug}")
 
-            # "Post" / "게시물" / "Reel" 등 타입 선택 (모달이 뜨는 경우)
-            page.evaluate("""() => {
+            # "Post" 타입 선택 — Instagram은 아이콘 label + 텍스트가 합쳐져 'PostPost' 형태로 나옴
+            type_clicked = page.evaluate("""() => {
+                const candidates = [
+                    'Post', 'PostPost', '게시물', '게시물게시물',
+                    'Reel', 'ReelReel', '릴스', '릴스릴스'
+                ];
                 const btns = Array.from(document.querySelectorAll('[role="menuitem"], [role="button"], a, li'));
                 for (const btn of btns) {
-                    const t = btn.textContent?.trim();
-                    if (t === 'Post' || t === '게시물' || t === 'Reel' || t === '릴스') {
-                        btn.click(); return t;
+                    const t = (btn.textContent?.trim() || '');
+                    if (candidates.includes(t)) {
+                        btn.click();
+                        return 'CLICKED:' + t;
                     }
                 }
+                return 'NOT_FOUND';
             }""")
-            time.sleep(2)
+            print(f"[타입 선택] {type_clicked}")
+            time.sleep(3)
             page.screenshot(path="ig_2b_after_type.png")
 
-            # 타입 선택 후 버튼 목록 재확인
+            # 타입 선택 후 버튼 목록
             btns_debug2 = page.evaluate("""() => {
                 const btns = Array.from(document.querySelectorAll('[role="button"], button'));
                 return btns.map(b => b.textContent?.trim()).filter(t => t && t.length < 80).slice(0, 20);
@@ -87,11 +94,14 @@ def post_reel(video_path: str, caption: str) -> bool:
             try:
                 with page.expect_file_chooser(timeout=10000) as fc_info:
                     clicked = page.evaluate("""() => {
+                        const candidates = [
+                            'Select from computer', '컴퓨터에서 선택',
+                            'Select From Computer', 'Select from Computer'
+                        ];
                         const btns = Array.from(document.querySelectorAll('[role="button"], button, div, span'));
                         for (const btn of btns) {
                             const t = (btn.textContent?.trim() || '');
-                            if (t === 'Select from computer' || t === '컴퓨터에서 선택'
-                                || t.includes('from computer') || t.includes('컴퓨터에서')) {
+                            if (candidates.includes(t) || t.toLowerCase().includes('from computer') || t.includes('컴퓨터에서')) {
                                 btn.click();
                                 return 'CLICKED:' + t;
                             }
@@ -103,7 +113,9 @@ def post_reel(video_path: str, caption: str) -> bool:
                 file_chooser.set_files(abs_video)
                 print(f"[업로드] 파일 설정 완료: {abs_video}")
             except Exception as fe:
-                print(f"[파일 chooser 실패] {fe} - fallback: hidden input 시도")
+                print(f"[파일 chooser 실패] {fe}")
+                page.screenshot(path="ig_error_upload.png")
+                # fallback: hidden input 노출 시도
                 page.evaluate("""() => {
                     const inputs = document.querySelectorAll('input[type="file"]');
                     inputs.forEach(inp => {
@@ -117,10 +129,9 @@ def post_reel(video_path: str, caption: str) -> bool:
                 file_input = page.locator('input[type="file"]').first
                 if file_input.count() > 0:
                     file_input.set_input_files(abs_video)
-                    print("[업로드] fallback 성공")
+                    print("[업로드] fallback hidden input 성공")
                 else:
-                    print("[오류] file input 없음")
-                    page.screenshot(path="ig_error_noinput.png")
+                    print("[오류] file input 없음 — 포기")
                     return False
 
             time.sleep(6)
