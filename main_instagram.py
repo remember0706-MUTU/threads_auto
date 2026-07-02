@@ -12,6 +12,7 @@ from quote_generator import generate_quote_content, get_today_category
 from image_fetcher import search_pexels_image
 from reels_creator import create_reels_video
 from instagram_poster import post_reel
+from facebook_video_poster import post_video_to_facebook
 
 
 def run_instagram_reels() -> bool:
@@ -58,6 +59,14 @@ def run_instagram_reels() -> bool:
     # 인스타그램 게시
     success = post_reel(video_path, korean_text)
 
+    # 페이스북 페이지에 같은 영상 게시
+    fb_caption = korean_text + ("\n\n" + english_text if english_text else "")
+    try:
+        fb_success = post_video_to_facebook(video_path, fb_caption)
+    except Exception as e:
+        print(f"[Facebook] 게시 중 오류: {e}")
+        fb_success = False
+
     # 정리
     for f in [image_path, video_path]:
         if f and os.path.exists(f):
@@ -67,6 +76,7 @@ def run_instagram_reels() -> bool:
         print("[완료] Instagram Reels 게시 성공!")
     else:
         print("[실패] Instagram Reels 게시 실패")
+    print(f"[Facebook] {'게시 성공' if fb_success else '게시 실패'}")
     print("="*50)
     return success
 
