@@ -126,14 +126,14 @@ def create_reels_video(text: str, image_path: str = None,
     n_pairs = min(len(body_lines_raw), len(en_lines_raw)) if (text_en and en_lines_raw) else len(body_lines_raw)
     n_pairs = max(n_pairs, 1)
     if n_pairs <= 4:
-        ko_size, en_size = 37, 27
+        ko_size, en_size = 38, 28
     elif n_pairs <= 6:
-        ko_size, en_size = 31, 24
+        ko_size, en_size = 32, 25
     else:
-        ko_size, en_size = 27, 21
+        ko_size, en_size = 28, 22
 
     font_body = find_korean_font(ko_size)
-    font_tag  = find_korean_font(27)
+    font_tag  = find_korean_font(28)
     font_en   = find_korean_font(en_size) if text_en else None
 
     # ── 인터리브 쌍 구성: 한글·영어 줄 수가 같은 범위만 쌍으로 묶음 ──
