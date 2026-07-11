@@ -3,3 +3,9 @@ post_log.txt
 debug_result.txt
 __pycache__/
 *.pyc
+
+# 런타임 로그 / 개인정보 산출물 (아이디 목록·피드 스크린샷 등)
+run_log.txt
+threads_unfollow_log.json
+threads_unfollow_run.log
+debug_*.png
